@@ -39,13 +39,16 @@
                 };
 
                 $statusLabel = ucfirst(str_replace('_', ' ', $status));
+                $route = $isInternalAssessor 
+                    ? route('program.areas.evaluation', [$infoId, $levelId, $programId, $mapping->id])
+                    : route('program.areas.parameters', [$infoId, $levelId, $programId, $mapping->id]);
             @endphp
 
             <div class="col-md-4">
                 <div class="card area-card h-100 shadow-sm d-flex flex-column"
                      style="border-radius: 10px; border-color: #e2e8f0;">
 
-                    <a href="{{ route('program.areas.evaluation', [$infoId, $levelId, $programId, $mapping->id]) }}"
+                    <a href="{{ $route }}"
                        class="text-decoration-none flex-grow-1 d-flex flex-column">
 
                         {{-- Card Header --}}

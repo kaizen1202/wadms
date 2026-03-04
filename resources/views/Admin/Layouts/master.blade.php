@@ -68,23 +68,25 @@
                         </div>
                     </div>
 
-                    <div class="navbar-nav align-items-center ms-auto">
-                        <div class="nav-item d-flex align-items-center">
-                            <button type="button"
-                                class="btn btn-primary d-flex align-items-center gap-2 px-3"
-                                style="border-radius:8px; min-width:220px; justify-content:space-between;"
-                                @click="$refs.globalSearch.open()">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bx bx-search"></i>
-                                    <span style="font-size:0.875rem;">Search...</span>
-                                </div>
-                                <kbd style="font-size:0.65rem; padding:2px 7px; border-radius:4px;
-                                            background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff;">
-                                    Ctrl K
-                                </kbd>
-                            </button>
+                    @if ($user->status === \App\Enums\UserStatus::ACTIVE->value)
+                        <div class="navbar-nav align-items-center ms-auto">
+                            <div class="nav-item d-flex align-items-center">
+                                <button type="button"
+                                    class="btn btn-primary d-flex align-items-center gap-2 px-3"
+                                    style="border-radius:8px; min-width:220px; justify-content:space-between;"
+                                    @click="$refs.globalSearch.open()">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bx bx-search"></i>
+                                        <span style="font-size:0.875rem;">Search...</span>
+                                    </div>
+                                    <kbd style="font-size:0.65rem; padding:2px 7px; border-radius:4px;
+                                                background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff;">
+                                        Ctrl K
+                                    </kbd>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
             </nav>
 

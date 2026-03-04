@@ -23,20 +23,21 @@
 
     <div class="container-xxl container-p-y">
 
-        {{-- Breadcrumb --}}
-        <div class="mb-3">
-            <a href="{{ $backUrl }}" class="btn btn-sm btn-outline-secondary">
-                ← Back
+        {{-- Header --}}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">
+                    {{ $subParameter->sub_parameter_name }}
+                </h4>
+                <p class="text-muted mb-0">
+                    Upload documents for this sub-parameter
+                </p>
+            </div>
+            <a href="{{ $backUrl }}" class="btn btn-secondary">
+                <i class="bx bx-arrow-back me-1"></i>
+                Back
             </a>
         </div>
-
-        {{-- Header --}}
-        <h4 class="fw-bold mb-1">
-            {{ $subParameter->sub_parameter_name }}
-        </h4>
-        <p class="text-muted mb-4">
-            Upload documents for this sub-parameter
-        </p>
         
         {{-- Upload Card --}}
         <div class="card mb-4">
@@ -57,16 +58,41 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Upload Files</label>
-                            <input type="file" name="files[]" class="form-control" multiple required>
 
-                            <small class="text-muted">
-                                Multiple files allowed (PDF, DOCX, Images).
-                            </small>
+                            {{-- Drop zone --}}
+                            <div id="dropZone"
+                                onclick="document.getElementById('fileInput').click()"
+                                style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 2rem 1.5rem;
+                                        background: #f8fafc; cursor: pointer; transition: all .2s;
+                                        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;"
+                                ondragover="event.preventDefault(); this.style.borderColor='#0d6efd'; this.style.background='#eff6ff';"
+                                ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#f8fafc';"
+                                ondrop="handleDrop(event)">
+
+                                <div style="width:48px; height:48px; background:#e0eaff; border-radius:50%;
+                                            display:flex; align-items:center; justify-content:center;">
+                                    <i class="bx bx-cloud-upload" style="font-size:1.5rem; color:#0d6efd;"></i>
+                                </div>
+                                <div class="text-center">
+                                    <span class="fw-semibold text-dark" style="font-size:.9rem;">Click to upload or drag & drop</span><br>
+                                    <small class="text-muted">PDF files only · Max 10MB each</small>
+                                </div>
+                            </div>
+
+                            {{-- Hidden input --}}
+                            <input type="file" id="fileInput" name="files[]" multiple required
+                                accept="application/pdf" style="display:none;"
+                                onchange="handleFiles(this.files)">
+
+                            {{-- File list --}}
+                            <ul id="fileList" class="list-unstyled mt-3 mb-0" style="display:none;"></ul>
                         </div>
 
-                        <button class="btn btn-primary">
-                            <i class="bx bx-upload me-1"></i> Upload
-                        </button>
+                        <div class="text-center">
+                            <button class="btn btn-primary px-4">
+                                <i class="bx bx-upload me-1"></i> Upload
+                            </button>
+                        </div>
                     </form>
                 </div>  
             @endif
@@ -112,7 +138,7 @@
                                         {{ ucfirst($upload->uploaderRole->name ?? 'N/A') }}
                                     </span>
                                 </td>
-                                <td>{{ $upload->created_at->format('M d, Y') }}</td>
+                                <td>{{ $upload->created_at->format('M d, Y h:i A') }}</td>
                                 <td class="d-flex gap-1">
 
                                     {{-- VIEW --}}
@@ -208,6 +234,71 @@ $(document).ready(function () {
     });
 
 });
+
+const dt = new DataTransfer();
+
+function handleDrop(e) {
+    e.preventDefault();
+    const zone = document.getElementById('dropZone');
+    zone.style.borderColor = '#cbd5e1';
+    zone.style.background  = '#f8fafc';
+    handleFiles(e.dataTransfer.files);
+}
+
+function handleFiles(incoming) {
+    for (const file of incoming) {
+        if (file.type !== 'application/pdf') {
+            alert(`"${file.name}" is not a PDF and was skipped.`);
+            continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert(`"${file.name}" exceeds 10MB and was skipped.`);
+            continue;
+        }
+        dt.items.add(file);
+    }
+    document.getElementById('fileInput').files = dt.files;
+    renderList();
+}
+
+function removeFile(index) {
+    dt.items.remove(index);
+    document.getElementById('fileInput').files = dt.files;
+    renderList();
+}
+
+function renderList() {
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+
+    if (dt.files.length === 0) {
+        list.style.display = 'none';
+        return;
+    }
+
+    list.style.display = 'block';
+
+    Array.from(dt.files).forEach((file, i) => {
+        const size = (file.size / 1024).toFixed(1) + ' KB';
+        const li = document.createElement('li');
+        li.style.cssText = 'display:flex; align-items:center; gap:.75rem; padding:.6rem .75rem; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.5rem;';
+        li.innerHTML = `
+            <div style="width:36px;height:36px;background:#fee2e2;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="bx bxs-file-pdf" style="color:#ef4444;font-size:1.1rem;"></i>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div class="fw-semibold text-truncate text-dark" style="font-size:.82rem;">${file.name}</div>
+                <div class="text-muted" style="font-size:.72rem;">${size}</div>
+            </div>
+            <button type="button" onclick="removeFile(${i})"
+                    style="border:none;background:none;color:#94a3b8;cursor:pointer;padding:.25rem;line-height:1;"
+                    title="Remove">
+                <i class="bx bx-x" style="font-size:1.1rem;"></i>
+            </button>
+        `;
+        list.appendChild(li);
+    });
+}
 </script>
 @endpush
 @endsection

@@ -18,13 +18,16 @@
             <i class="bx bx-arrow-back me-1"></i> Back
         </a>
     </h4>
-     <p class="text-muted mb-4">Submitted Area Evaluation</p>
+    <p class="text-muted mb-4">{{ $evaluation->is_final ? 'Final' : 'Submitted' }} Area Evaluation</p>
     <div class="mb-3 mt-3">
-        <strong>Assessor:</strong> {{ $evaluation->evaluator->name ?? 'N/A' }} <br>
+        <strong>Assessor:</strong>
+        {{ $evaluation->evaluator->name ?? 'N/A' }}
+        @if($evaluation->evaluator && auth()->id() === $evaluation->evaluator->id)
+            <span class="text-muted">(You)</span>
+        @endif
+        <br>
         <strong>Date Submitted:</strong> {{ $evaluation->updated_at->format('F d, Y') }}
     </div>
-
-    
 
     {{-- LOCKED / DRAFT NOTICE --}}
     @if(

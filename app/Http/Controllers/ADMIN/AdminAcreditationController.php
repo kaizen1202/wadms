@@ -876,7 +876,7 @@ class AdminAcreditationController extends Controller
             ->sortByDesc(fn ($a) => strtolower($a->role?->value ?? '') === 'chair');
 
         // ================= ROLE-BASED ASSIGNMENTS FOR VIEW =================
-        if ($isAdmin) {
+        if ($isAdmin || $isAccreditor) {
             $assignments = $internalAssessors;
         } elseif ($isDean || $isTaskForce) {
             $assignments = $taskForces;
@@ -892,8 +892,6 @@ class AdminAcreditationController extends Controller
             'context'            => $context,
             'programArea'        => $programArea,
             'assignments'        => $assignments,
-            // Pass both sets separately so the blade can show
-            // avatars for both groups regardless of viewer role
             'internalAssessors'  => $internalAssessors,
             'taskForces'         => $taskForces,
             'parameters'         => $programArea->parameters,
@@ -992,7 +990,7 @@ class AdminAcreditationController extends Controller
     ) {
         $request->validate([
             'files' => 'required|array',
-            'files.*' => 'file|max:10240',
+            'files.*' => 'file|mimes:pdf|max:10240',
         ]);
 
         $user = auth()->user();
@@ -1161,7 +1159,7 @@ class AdminAcreditationController extends Controller
                     $q->wherePivot('role_id', $iaRoleId)
                     ->wherePivot('role', null);
 
-                } elseif ($isDean || $isTaskForce || $isAccreditor) {
+                } elseif ($isDean || $isTaskForce) {
                     // Accreditor sees same view as Dean — Task Force assignments
                     $q->wherePivot('role_id', $tfRoleId)
                     ->wherePivotNotNull('role');

@@ -250,4 +250,8 @@ Route::get('/global-search', [SearchController::class, 'global'])
     ->name('global.search')
     ->middleware('auth');
 
+// Route for privacy policy and terms and conditions
+Route::view('/privacy-policy', 'privacy-policy')->name('privacy');
+Route::view('/terms-and-conditions', 'terms-and-conditions')->name('terms');
+
 require __DIR__ . '/auth.php';

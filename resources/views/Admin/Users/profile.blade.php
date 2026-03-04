@@ -121,7 +121,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Reason (Optional)</label>
+                        <label class="form-label">Reason</label>
                         <textarea name="reason" class="form-control" rows="3"
                             placeholder="Explain why you are requesting this role"></textarea>
                     </div>

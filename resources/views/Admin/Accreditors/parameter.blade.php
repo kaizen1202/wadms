@@ -13,13 +13,11 @@
         </div>
 
         {{-- ASSIGNED USERS --}}
-        @if (!$isAccreditor)
         <div class="card mb-4">
             <div class="card-body">
 
-                {{-- ===== INTERNAL ASSESSORS (Admin sees this) ===== --}}
                 {{-- ===== INTERNAL ASSESSORS ===== --}}
-                @if ($isAdmin || $isIA)
+                @if ($isAdmin || $isIA || $isAccreditor)
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="fw-bold mb-0">
                             <i class="bx bx-user-check me-2 text-primary"></i>Internal Assessors
@@ -143,7 +141,6 @@
 
             </div>
         </div>
-        @endif
 
         {{-- PARAMETERS CARD --}}
         <div class="card">

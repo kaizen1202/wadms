@@ -409,46 +409,91 @@ class DashboardController extends Controller
             ->count();
 
         // ── ASSIGNED AREAS OVERVIEW ──
-        $assignedAreas = $assignments->map(function ($assignment) use ($user, $internalAssessorRoleId) {
-            $evaluation = AccreditationEvaluation::where([
-                'area_id'      => $assignment->area_id,
-                'evaluated_by' => $user->id,
-                'role_id'      => $internalAssessorRoleId,
-            ])->first();
+        $assignedAreas = $assignments
+            ->unique(fn ($a) => $a->area_id . '-' . $a->program_id . '-' . $a->level_id)
+            ->groupBy('accred_info_id')
+            ->map(function ($byAccred) use ($user, $internalAssessorRoleId) {
 
-            return [
-                'area_id'      => $assignment->area_id,
-                'area_name'    => $assignment->area?->area_name ?? 'N/A',
-                'info_id'      => $assignment->accred_info_id,
-                'info_title'   => $assignment->accreditationInfo?->title . ' ' . $assignment->accreditationInfo?->year,
-                'level_id'     => $assignment->level_id,
-                'level_name'   => $assignment->level?->level_name ?? 'N/A',
-                'program_id'   => $assignment->program_id,
-                'program_name' => $assignment->program?->program_name ?? 'N/A',
-                'status'       => $evaluation?->status,
-                'evaluation'   => $evaluation,
-                'assigned_at'  => $assignment->created_at,
-            ];
-        })->unique('area_id')->values();
+                $first = $byAccred->first();
+
+                return [
+                    'accreditation' => trim(($first->accreditationInfo?->title ?? '') . ' ' . ($first->accreditationInfo?->year ?? '')),
+                    'info_id'       => $first->accred_info_id,
+                    'levels'        => $byAccred->groupBy('level_id')->map(function ($byLevel) use ($user, $internalAssessorRoleId) {
+
+                        $firstLevel = $byLevel->first();
+
+                        return [
+                            'level_id'   => $firstLevel->level_id,
+                            'level_name' => $firstLevel->level?->level_name ?? 'N/A',
+                            'programs'   => $byLevel->groupBy('program_id')->map(function ($byProgram) use ($user, $internalAssessorRoleId) {
+
+                                $firstProgram = $byProgram->first();
+
+                                $areas = $byProgram->map(function ($assignment) use ($user, $internalAssessorRoleId) {
+                                    $evaluation = AccreditationEvaluation::where([
+                                        'area_id'      => $assignment->area_id,
+                                        'evaluated_by' => $user->id,
+                                        'role_id'      => $internalAssessorRoleId,
+                                        'program_id'   => $assignment->program_id,
+                                        'level_id'     => $assignment->level_id,
+                                    ])->first();
+
+                                    return [
+                                        'area_id'      => $assignment->area_id,
+                                        'area_name'    => $assignment->area?->area_name ?? 'N/A',
+                                        'info_id'      => $assignment->accred_info_id,
+                                        'level_id'     => $assignment->level_id,
+                                        'program_id'   => $assignment->program_id,
+                                        'status'       => $evaluation?->status,
+                                        'evaluation'   => $evaluation,
+                                    ];
+                                })->values();
+
+                                $total     = $areas->count();
+                                $finalized = $areas->filter(fn ($a) => $a['status'] === EvaluationStatus::FINALIZED)->count();
+
+                                return [
+                                    'program_id'         => $firstProgram->program_id,
+                                    'program_name'       => $firstProgram->program?->program_name ?? 'N/A',
+                                    'areas'              => $areas,
+                                    'totalAreas'         => $total,
+                                    'finalizedAreaCount' => $finalized,
+                                ];
+                            })->values(),
+                        ];
+                    })->values(),
+                ];
+            })->values();
 
         // ── RECENT ACTIVITIES ──
         // Own evaluations
-        $ownEvaluations = AccreditationEvaluation::with(['area'])
+        $ownEvaluations = AccreditationEvaluation::with(['area', 'accreditationInfo', 'level', 'program'])
             ->where('evaluated_by', $user->id)
             ->whereIn('status', [EvaluationStatus::SUBMITTED->value, EvaluationStatus::FINALIZED->value])
             ->latest('updated_at')
             ->get()
             ->map(fn ($e) => [
-                'icon'      => $e->status === EvaluationStatus::FINALIZED ? 'bx-check-shield' : 'bx-file',
-                'color'     => $e->status === EvaluationStatus::FINALIZED ? 'text-success'    : 'text-primary',
-                'text'      => 'You ' . ($e->status === EvaluationStatus::FINALIZED ? 'finalized' : 'submitted')
-                                . ' evaluation for ' . ($e->area?->area_name ?? 'an area') . '.',
-                'sort_date' => $e->updated_at,
-                'time'      => $e->updated_at->diffForHumans(),
+                'icon'          => $e->status === EvaluationStatus::FINALIZED ? 'bx-check-shield' : 'bx-file',
+                'color'         => $e->status === EvaluationStatus::FINALIZED ? 'text-success' : 'text-primary',
+                'text' => 'You ' . ($e->status === EvaluationStatus::FINALIZED ? 'finalized' : 'submitted')
+                    . ' evaluation for ' . trim(explode(':', $e->area?->area_name ?? 'an area')[0]) . '.',
+                'sort_date'     => $e->updated_at,
+                'time'          => $e->updated_at->diffForHumans(),
+                'date'          => $e->updated_at->format('M d, Y h:i A'),  // ← add
+                'accreditation' => trim(($e->accreditationInfo?->title ?? '') . ' ' . ($e->accreditationInfo?->year ?? '')),  // ← add
+                'level'         => $e->level?->level_name ?? null,  // ← add
+                'program'       => $e->program?->program_name ?? null,  // ← add
             ]);
 
-        // Task force uploads in assigned areas
-        $taskForceUploads = AccreditationDocuments::with(['uploader', 'area'])
+        $taskForceUploads = AccreditationDocuments::with([
+                'uploader',
+                'area',
+                'accredInfo',
+                'level',
+                'program',
+                'subParameter.parameter',  // ← subparameter with its parent parameter
+            ])
             ->whereIn('area_id', $assignedAreaIds)
             ->whereHas('uploader', function ($q) use ($taskForceRoleId) {
                 $q->whereHas('roles', function ($q2) use ($taskForceRoleId) {
@@ -458,14 +503,18 @@ class DashboardController extends Controller
             ->latest()
             ->get()
             ->map(fn ($d) => [
-                'icon'      => 'bx-upload',
-                'color'     => 'text-info',
-                'text'      => ($d->uploader?->name ?? 'Someone')
-                                . ' uploaded a document'
-                                . ($d->area ? ' for ' . $d->area->area_name : '')
-                                . ($d->file_name ? ' (' . $d->file_name . ')' : '') . '.',
-                'sort_date' => $d->created_at,
-                'time'      => $d->created_at->diffForHumans(),
+                'icon'          => 'bx-upload',
+                'color'         => 'text-info',
+                'text' => ($d->uploader?->name ?? 'Someone')
+                    . ' uploaded ' . ($d->file_name ?? 'a document')
+                    . ' in ' . trim(explode(':', $d->area?->area_name ?? 'an area')[0])
+                    . ($d->subParameter ? ' - ' . explode(' ', trim($d->subParameter->sub_parameter_name))[0] : '') . '.',
+                'sort_date'     => $d->created_at,
+                'time'          => $d->created_at->diffForHumans(),
+                'date'          => $d->created_at->format('M d, Y h:i A'),
+                'accreditation' => trim(($d->accredInfo?->title ?? '') . ' ' . ($d->accredInfo?->year ?? '')),
+                'level'         => $d->level?->level_name ?? null,
+                'program'       => $d->program?->program_name ?? null,
             ]);
 
         $recentActivities = $ownEvaluations
@@ -497,98 +546,123 @@ class DashboardController extends Controller
             ->count();
 
         // ── ACCREDITATION OVERVIEW ──
-        $ongoingAccreditation = AccreditationInfo::where('status', AccreditationStatus::ONGOING)
+        $ongoingAccreditations = AccreditationInfo::where('status', AccreditationStatus::ONGOING)
             ->with([
+                'infoLevelProgramMappings.program',
                 'infoLevelProgramMappings.programAreas.area',
                 'infoLevelProgramMappings.level',
             ])
             ->latest()
-            ->first();
+            ->get(); // ← get() instead of first()
 
-        $overviewAreas      = collect();
-        $totalAreas         = 0;
-        $finalizedAreaCount = 0;
-        $levelName          = null;
+        $accreditationOverviews = $ongoingAccreditations->map(function ($accreditation) use ($internalAssessorRoleId) {
 
-        if ($ongoingAccreditation) {
-            $allProgramAreas = $ongoingAccreditation
-                ->infoLevelProgramMappings
-                ->flatMap(fn ($m) => $m->programAreas)
-                ->unique('area_id');
+            // Group mappings by level
+            $levelGroups = $accreditation->infoLevelProgramMappings->groupBy('level_id');
 
-            $totalAreas = $allProgramAreas->count();
+            $levels = $levelGroups->map(function ($mappings) use ($accreditation, $internalAssessorRoleId) {
 
-            $rawLevel  = $ongoingAccreditation->infoLevelProgramMappings->first()?->level?->level_name;
-            $levelName = match(true) {
-                str_contains(strtolower($rawLevel ?? ''), 'preliminary') => 'Preliminary Survey Visit (PSV)',
-                str_contains(strtolower($rawLevel ?? ''), 'level i')     => 'Level I',
-                str_contains(strtolower($rawLevel ?? ''), 'level ii')    => 'Level II',
-                str_contains(strtolower($rawLevel ?? ''), 'level iii')   => 'Level III',
-                str_contains(strtolower($rawLevel ?? ''), 'level iv')    => 'Level IV',
-                default => $rawLevel ?? 'N/A',
-            };
+                $rawLevel  = $mappings->first()?->level?->level_name;
+                $levelName = match(true) {
+                    str_contains(strtolower($rawLevel ?? ''), 'preliminary') => 'Preliminary Survey Visit (PSV)',
+                    str_contains(strtolower($rawLevel ?? ''), 'level i')     => 'Level I',
+                    str_contains(strtolower($rawLevel ?? ''), 'level ii')    => 'Level II',
+                    str_contains(strtolower($rawLevel ?? ''), 'level iii')   => 'Level III',
+                    str_contains(strtolower($rawLevel ?? ''), 'level iv')    => 'Level IV',
+                    default => $rawLevel ?? 'N/A',
+                };
 
-            $overviewAreas = $allProgramAreas->map(function ($programArea) use ($ongoingAccreditation, $internalAssessorRoleId) {
-                $finalizedEvals = AccreditationEvaluation::where([
-                    'accred_info_id' => $ongoingAccreditation->id,
-                    'area_id'        => $programArea->area_id,
-                    'role_id'        => $internalAssessorRoleId,
-                ])->where('status', EvaluationStatus::FINALIZED->value)->get();
+                // Group by program within this level
+                $programs = $mappings->map(function ($mapping) use ($accreditation, $internalAssessorRoleId) {
 
-                $allEvals = AccreditationEvaluation::where([
-                    'accred_info_id' => $ongoingAccreditation->id,
-                    'area_id'        => $programArea->area_id,
-                    'role_id'        => $internalAssessorRoleId,
-                ])->get();
+                    $overviewAreas = $mapping->programAreas->map(function ($programArea) use ($accreditation, $internalAssessorRoleId, $mapping) {
 
-                $status = 'pending';
-                if ($finalizedEvals->isNotEmpty()) {
-                    $status = 'finalized';
-                }
+                        $finalizedEvals = AccreditationEvaluation::where([
+                            'accred_info_id' => $accreditation->id,
+                            'area_id'        => $programArea->area_id,
+                            'role_id'        => $internalAssessorRoleId,
+                        ])->where('status', EvaluationStatus::FINALIZED->value)->get();
 
-                $mapping = $programArea->infoLevelProgramMapping;
+                        $allEvals = AccreditationEvaluation::where([
+                            'accred_info_id' => $accreditation->id,
+                            'area_id'        => $programArea->area_id,
+                            'role_id'        => $internalAssessorRoleId,
+                        ])->get();
+
+                        return [
+                            'area_id'         => $programArea->area_id,
+                            'area_name'       => $programArea->area->area_name ?? 'N/A',
+                            'status'          => $finalizedEvals->isNotEmpty() ? 'finalized' : 'pending',
+                            'assigned_count'  => $allEvals->pluck('evaluated_by')->unique()->count(),
+                            'evaluation'      => $finalizedEvals->sortByDesc('updated_at')->first(),
+                            'info_id'         => $accreditation->id,
+                            'level_id'        => $mapping->level_id,
+                            'program_id'      => $mapping->program_id,
+                            'program_area_id' => $programArea->id,
+                        ];
+                    });
+
+                    $finalizedAreaCount = $overviewAreas->where('status', 'finalized')->count();
+
+                    return [
+                        'program_name'       => $mapping->program->program_name ?? 'N/A',
+                        'overviewAreas'      => $overviewAreas,
+                        'totalAreas'         => $overviewAreas->count(),
+                        'finalizedAreaCount' => $finalizedAreaCount,
+                    ];
+                });
 
                 return [
-                    'area_id'         => $programArea->area_id,
-                    'area_name'       => $programArea->area->area_name ?? 'N/A',
-                    'status'          => $status,
-                    'assigned_count'  => $allEvals->pluck('evaluated_by')->unique()->count(),
-                    'evaluation'      => $finalizedEvals->sortByDesc('updated_at')->first(),
-                    'info_id'         => $ongoingAccreditation->id,
-                    'level_id'        => $mapping?->level_id,
-                    'program_id'      => $mapping?->program_id,
-                    'program_area_id' => $programArea->id,
+                    'levelName' => $levelName,
+                    'programs'  => $programs,
                 ];
             });
 
-            $finalizedAreaCount = $overviewAreas->where('status', 'finalized')->count();
-        }
+            return [
+                'accreditation' => $accreditation,
+                'levels'        => $levels,
+            ];
+        });
 
         // ── RECENT ACTIVITIES ──
-        $recentActivities = AccreditationEvaluation::with(['evaluator', 'area'])
-            ->where('role_id', $internalAssessorRoleId)
-            ->whereIn('status', [EvaluationStatus::SUBMITTED->value, EvaluationStatus::FINALIZED->value])
-            ->latest('updated_at')
-            ->get()
-            ->map(fn ($e) => [
-                'icon'  => $e->status === EvaluationStatus::FINALIZED ? 'bx-check-shield' : 'bx-file',
-                'color' => $e->status === EvaluationStatus::FINALIZED ? 'text-success'    : 'text-primary',
-                'text'  => ($e->evaluator?->name ?? 'Someone')
+        $recentActivities = AccreditationEvaluation::with([
+            'evaluator',
+            'area',
+            'accreditationInfo',
+            'level',
+            'program',
+        ])
+        ->where('role_id', $internalAssessorRoleId)
+        ->whereIn('status', [EvaluationStatus::SUBMITTED->value, EvaluationStatus::FINALIZED->value])
+        ->latest('updated_at')
+        ->get()
+        ->groupBy('accred_info_id')
+        ->map(fn ($byAccred) => [
+            'accreditation' => trim(($byAccred->first()->accreditationInfo?->title ?? '') . ' ' . ($byAccred->first()->accreditationInfo?->year ?? '')),
+            'levels' => $byAccred->groupBy('level_id')->map(fn ($byLevel) => [
+                'level'    => $byLevel->first()->level?->level_name ?? 'N/A',
+                'programs' => $byLevel->groupBy('program_id')->map(fn ($byProgram) => [
+                    'program'    => $byProgram->first()->program?->program_name ?? 'N/A',
+                    'activities' => $byProgram->map(fn ($e) => [
+                        'icon'  => $e->status === EvaluationStatus::FINALIZED ? 'bx-check-shield' : 'bx-file',
+                        'color' => $e->status === EvaluationStatus::FINALIZED ? 'text-success'    : 'text-primary',
+                        'text' => ($e->evaluator?->name ?? 'Someone')
                             . ($e->status === EvaluationStatus::FINALIZED ? ' finalized ' : ' submitted ')
-                            . 'evaluation for ' . ($e->area?->area_name ?? 'an area') . '.',
-                'time'  => $e->updated_at->diffForHumans(),
-            ]);
+                            . 'evaluation for ' . (explode(':', $e->area?->area_name ?? 'an area')[0]) . '.',
+                        'area'  => $e->area?->area_name ?? null,
+                        'time'  => $e->updated_at->diffForHumans(),
+                        'date'  => $e->updated_at->format('M d, Y h:i A'),
+                    ]),
+                ]),
+            ]),
+        ]);
 
         return compact(
             'ongoingCount',
             'completedCount',
             'programsCount',
             'finalizedEvaluations',
-            'ongoingAccreditation',
-            'overviewAreas',
-            'totalAreas',
-            'finalizedAreaCount',
-            'levelName',
+            'accreditationOverviews',
             'recentActivities',
         );
     }

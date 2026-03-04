@@ -508,8 +508,8 @@
             <div class="flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
                 <p>© {{ date('Y') }} Palompon Institute of Technology. All Rights Reserved.</p>
                 <div class="flex space-x-6 mt-4 md:mt-0">
-                    <a href="#" class="hover:text-[#696CFF] transition-colors">Privacy Policy</a>
-                    <a href="#" class="hover:text-[#696CFF] transition-colors">Terms of Service</a>
+                    <a href="{{ route('privacy') }}" class="hover:text-[#696CFF] transition-colors">Privacy Policy</a>
+                    <a href="{{ route('terms') }}" class="hover:text-[#696CFF] transition-colors">Terms and Conditions</a>
                     <a href="#" class="hover:text-[#696CFF] transition-colors">Contact</a>
                 </div>
             </div>
