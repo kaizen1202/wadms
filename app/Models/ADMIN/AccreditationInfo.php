@@ -40,6 +40,11 @@ class AccreditationInfo extends Model
         );
     }
 
+    public function infoLevelProgramMappings()
+    {
+        return $this->hasMany(InfoLevelProgramMapping::class, 'accreditation_info_id');
+    }
+
     /* ===================== Helpers ===================== */
 
     public function isOngoing(): bool

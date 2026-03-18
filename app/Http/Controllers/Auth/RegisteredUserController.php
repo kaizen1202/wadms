@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\User;
 use App\Enums\UserType;
 
@@ -11,7 +12,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Illuminate\Validation\Rule;
 
@@ -43,13 +47,23 @@ class RegisteredUserController extends Controller
                     UserType::ACCREDITOR
                 ])
             ],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->letters()
+                    ->numbers()
+            ],
         ]);
+
+        $sluggedRoleReq = Str::slug($request->role, '_');
+        $role = Role::where('slug', $sluggedRoleReq)->firstOrFail();
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'user_type' => $request->role,
+            'current_role_id' => $role->id,
             'password' => Hash::make($request->password),
         ]);
 

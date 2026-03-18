@@ -27,6 +27,7 @@ class User extends Authenticatable
         'password',
         'status',
         'user_type',
+        'current_role_id'
     ];
 
     /**
@@ -62,6 +63,20 @@ class User extends Authenticatable
         );
     }
 
+    public function roleRequests()
+    {
+        return $this->hasMany(RoleRequest::class);
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'role_user_pivot', 'user_id', 'role_id');
+    }
+
+    public function currentRole()
+    {
+        return $this->belongsTo(Role::class, 'current_role_id');
+    }
 
     public function assignments()
     {

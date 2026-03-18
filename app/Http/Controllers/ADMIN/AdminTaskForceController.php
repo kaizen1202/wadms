@@ -16,8 +16,8 @@ class AdminTaskForceController extends Controller
     public function index()
     {
         $loggedInUser = auth()->user();
-        $isAdmin = $loggedInUser->user_type === UserType::ADMIN;
-        $isDean = $loggedInUser->user_type === UserType::DEAN;
+        $isAdmin = $loggedInUser->currentRole->name === UserType::ADMIN->value;
+        $isDean = $loggedInUser->currentRole->name === UserType::DEAN->value;
 
         return view(
             'admin.users.taskforce', 
@@ -32,19 +32,21 @@ class AdminTaskForceController extends Controller
     public function data(): JsonResponse
     {
         $user = auth()->user();
+        $isAdmin = $user->currentRole->name === UserType::ADMIN->value;
+        $isDean = $user->currentRole->name === UserType::DEAN->value;
 
         $allowedRoles = [];
-
-        if ($user->user_type === UserType::DEAN) {
-            $allowedRoles = [
-                UserType::TASK_FORCE,
-            ];
-        }
-
-        if ($user->user_type === UserType::ADMIN) {
+        
+        if ($isAdmin) {
             $allowedRoles = [
                 UserType::INTERNAL_ASSESSOR,
                 UserType::ACCREDITOR,
+            ];
+        }
+
+        if ($isDean) {
+            $allowedRoles = [
+                UserType::TASK_FORCE,
             ];
         }
 

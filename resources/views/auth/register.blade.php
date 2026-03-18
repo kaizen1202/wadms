@@ -179,10 +179,10 @@
                                             <select name="role"
                                                     required
                                                     class="form-select @error('role') is-invalid @enderror">
-                                                <option value="" disabled selected>Select your role</option>
-                                                <option value="{{ $taskForce }}">Task Force</option>
-                                                <option value="{{ $internalAssessor }}">Internal Assessor</option>
-                                                <option value="{{ $accreditor }}">Accreditor</option>
+                                                <option value="" disabled {{ old('role') ? '' : 'selected' }}>Select your role</option>
+                                                <option value="{{ $taskForce }}" {{ old('role') == $taskForce ? 'selected' : '' }}>Task Force</option>
+                                                <option value="{{ $internalAssessor }}" {{ old('role') == $internalAssessor ? 'selected' : '' }}>Internal Assessor</option>
+                                                <option value="{{ $accreditor }}" {{ old('role') == $accreditor ? 'selected' : '' }}>Accreditor</option>
                                             </select>
                                             @error('role') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                         </div>
@@ -190,16 +190,28 @@
                                         <!-- Password -->
                                         <div class="mb-3 form-password-toggle">
                                             <label class="form-label">Password</label>
-                                            <div class="input-group input-group-merge">
+
+                                            <div class="input-group input-group-merge has-validation">
                                                 <input type="password"
                                                     name="password"
+                                                    value="{{ old('password') }}"
                                                     required
                                                     class="form-control @error('password') is-invalid @enderror">
+
                                                 <span class="input-group-text cursor-pointer">
                                                     <i class="bx bx-hide"></i>
                                                 </span>
+
+                                                @error('password')
+                                                    <div class="invalid-feedback">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
                                             </div>
-                                            @error('password') <span class="invalid-feedback">{{ $message }}</span> @enderror
+
+                                            <small class="text-muted">
+                                                At least 8 characters long and include a letter and a number.
+                                            </small>
                                         </div>
 
                                         <!-- Confirm Password -->
@@ -208,11 +220,17 @@
                                             <div class="input-group input-group-merge">
                                                 <input type="password"
                                                     name="password_confirmation"
+                                                    value="{{ old('password_confirmation') }}"
                                                     required
                                                     class="form-control">
                                                 <span class="input-group-text cursor-pointer">
                                                     <i class="bx bx-hide"></i>
                                                 </span>
+                                                @error('password')
+                                                    <div class="invalid-feedback">
+                                                        {{ $message }}
+                                                    </div>
+                                                @enderror
                                             </div>
                                         </div>
 

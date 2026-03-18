@@ -43,8 +43,7 @@
             </div>
         </div>
     @else
-        {{-- NORMAL DASHBOARD CONTENT --}}
-        <h4>Welcome Dashboard</h4>
+        @include('admin.dashboard.partials.' . $roleView)
     @endif
 </div>
 @endsection

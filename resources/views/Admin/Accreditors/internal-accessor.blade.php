@@ -1,238 +1,259 @@
 @extends('admin.layouts.master')
 
 @section('contents')
-    <div class="container-xxl flex-grow-1 container-p-y">
+<div class="container-xxl container-p-y">
 
-        <h4 class="fw-bold py-3 mb-4">Internal Accreditation Overview</h4>
+    {{-- ===== PAGE HEADER ===== --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-1">Accreditation Overview</h4>
+            <small class="text-muted">Ongoing accreditation programs and evaluation progress</small>
+        </div>
+    </div>
 
-        @if (empty($data))
-            <p class="text-muted">No ongoing accreditations available.</p>
-        @else
-            @foreach ($data as $levelName => $levelInfo)
-                <div class="mb-5">
+    @if (empty($data))
+        <div class="card">
+            <div class="card-body empty-state">
+                <i class="bx bx-folder-open"></i>
+                No ongoing accreditations available.
+            </div>
+        </div>
+    @else
+        @foreach ($data as $levelName => $levelInfo)
+            <div class="mb-5">
 
-                    <h5 class="fw-bold text-primary mb-3">{{ $levelName }}</h5>
+                {{-- Level Heading --}}
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="bx bx-bar-chart-alt-2 text-primary"></i>
+                    <h5 class="fw-bold mb-0 text-primary">{{ $levelName }}</h5>
+                </div>
 
-                    <div class="row g-3">
+                <div class="row g-3">
+                    @forelse ($levelInfo['programs'] as $program)
+                        @php
+                            $progress = $program['progress'];
+                            $statusLabel = $program['accreditation_status_label'];
 
-                        @forelse($levelInfo['programs'] as $program)
-                            @php
-                                $progressColor =
-                                    $program['progress'] == 100
-                                        ? 'bg-success'
-                                        : ($program['progress'] > 0
-                                            ? 'bg-warning'
-                                            : 'bg-secondary');
-                            @endphp
+                            $progressColor = $progress >= 100
+                                ? 'bg-success'
+                                : ($progress > 0 ? 'bg-warning' : 'bg-secondary');
 
-                            <div class="col-md-4">
-                                <div class="card h-100 shadow-sm border-0">
-                                    <div class="card-body d-flex flex-column justify-content-between">
+                            $badgeClass = $statusLabel === 'Completed'
+                                ? 'bg-success'
+                                : ($statusLabel === 'Ongoing' ? 'bg-warning text-dark' : 'bg-secondary');
+                        @endphp
 
+                        <div class="col-md-4">
+                            <div class="card h-100 shadow-sm d-flex flex-column"
+                                 style="border-radius: 10px; border-color: #e2e8f0;">
+
+                                {{-- Card Header --}}
+                                <div class="card-header border-0 pb-0 pt-3 px-3">
+                                    <div class="d-flex justify-content-between align-items-start">
                                         <div>
-                                            <h6 class="card-title mb-1">
+                                            <p class="text-muted mb-1" style="font-size: 11px; text-transform: uppercase; letter-spacing: .5px;">
+                                                {{ $program['accreditation_title'] }}
+                                            </p>
+                                            <h6 class="fw-bold mb-0" style="font-size: 15px; line-height: 1.3;">
                                                 {{ $program['program_name'] ?? 'Unnamed Program' }}
                                             </h6>
-
-                                            <p class="text-muted small mb-1">
-                                                Accreditation: {{ $program['accreditation_title'] }}
-                                            </p>
-
-                                            <p class="small fw-semibold text-info mb-3">
-                                                Accreditation Status:
-                                                <span class="text-dark">
-                                                    {{ $program['accreditation_status_label'] }}
-                                                </span>
-                                            </p>
-
-                                            {{-- Progress (VISIBLE TO BOTH ACCREDITORS & INTERNAL ACCESSORS) --}}
-                                            <small class="text-muted">Evaluation Progress</small>
-                                            <div class="progress mb-2" style="height: 10px;">
-                                                <div class="progress-bar {{ $progressColor }}"
-                                                    style="width: {{ $program['progress'] }}%">
-                                                </div>
-                                            </div>
-
-                                            <small class="text-muted">
-                                                {{ $program['evaluated_areas'] }} / {{ $program['total_areas'] }} areas
-                                                evaluated
-                                            </small>
                                         </div>
+                                        <span class="badge {{ $badgeClass }} ms-2 flex-shrink-0">
+                                            {{ $statusLabel }}
+                                        </span>
+                                    </div>
+                                </div>
 
-                                        <div class="mt-3">
-                                            <a href="{{ route('internal.accessor.program.areas', [
+                                {{-- Card Body --}}
+                                <div class="card-body px-3 pt-3 pb-2 flex-grow-1">
+
+                                    {{-- Progress --}}
+                                    <div class="mb-1 d-flex justify-content-between align-items-center">
+                                        <small class="text-muted">Evaluation Progress</small>
+                                        <small class="fw-semibold" style="font-size: 11px;">
+                                            {{ $progress }}%
+                                        </small>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 6px; border-radius: 999px;">
+                                        <div class="progress-bar {{ $progressColor }}"
+                                             style="width: {{ $progress }}%; border-radius: 999px;">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 11px;">
+                                        <i class="bx bx-layer me-1"></i>
+                                        {{ $program['evaluated_areas'] }} / {{ $program['total_areas'] }} areas evaluated
+                                    </small>
+
+                                </div>
+
+                                {{-- Card Footer --}}
+                                <div class="card-footer border-0 px-3 pb-3 pt-0">
+                                    <div class="d-flex flex-column gap-2">
+                                        <a href="{{ route('internal.accessor.program.areas', [
                                                 $program['accreditation_id'],
                                                 $levelInfo['level_id'],
                                                 $program['program_id'],
                                             ]) }}"
-                                                class="btn btn-sm btn-outline-primary w-100">
-                                                View Program
-                                            </a>
+                                           class="btn btn-sm btn-outline-primary w-100">
+                                            <i class="bx bx-folder-open me-1"></i> View Program
+                                        </a>
 
-
-                                            @if ($canEvaluate && $program['progress'] == 100)
-                                                <button class="btn btn-sm btn-primary w-100 mt-1 open-final-verdict"
+                                        @if ($canEvaluate && $progress == 100)
+                                            <button class="btn btn-sm btn-primary w-100 open-final-verdict"
                                                     data-program="{{ $program['program_name'] }}"
                                                     data-program-id="{{ $program['program_id'] }}"
                                                     data-accred-info-id="{{ $program['accreditation_id'] }}"
                                                     data-level-id="{{ $levelInfo['level_id'] }}">
-                                                    Final Verdict
-                                                </button>
-                                            @endif
-                                        </div>
+                                                <i class="bx bx-check-shield me-1"></i> Final Verdict
+                                            </button>
+                                        @endif
                                     </div>
                                 </div>
+
                             </div>
-
-                        @empty
-                            <div class="col-12">
-                                <p class="text-muted fst-italic">
-                                    No programs available for this level.
-                                </p>
-                            </div>
-                        @endforelse
-
-                    </div>
-                </div>
-            @endforeach
-        @endif
-
-    </div>
-
-    {{-- ================= FINAL VERDICT MODAL ================= --}}
-    <div class="modal fade" id="finalVerdictModal" tabindex="-1" data-bs-backdrop="static">
-        <div class="modal-dialog modal-md modal-dialog-centered">
-            <form id="finalVerdictForm" class="modal-content">
-
-                {{-- Hidden IDs --}}
-                <input type="hidden" id="fvProgramId">
-                <input type="hidden" id="fvAccredInfoId">
-                <input type="hidden" id="fvLevelId">
-
-                <div class="modal-header">
-                    <h5 class="modal-title">Final Accreditation Verdict</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-
-                <div class="modal-body">
-
-                    <p class="small text-muted mb-3">
-                        You are submitting the final accreditation decision for:
-                        <br>
-                        <strong id="fvProgram"></strong>
-                    </p>
-
-                    {{-- STATUS --}}
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Accreditation Status</label>
-                        <select class="form-select" id="fvStatus" required>
-                            <option value="" selected disabled>Select status</option>
-                            <option value="revisit">Revisit</option>
-                            <option value="completed">Completed / Granted</option>
-                        </select>
-                    </div>
-
-                    {{-- REVISIT YEAR (ONLY IF REVISIT) --}}
-                    <div class="mb-3 d-none" id="revisitYearContainer">
-                        <label class="form-label fw-semibold">
-                            Revisit Until (Year)
-                        </label>
-                        <input type="number" class="form-control" id="fvRevisitYear" min="2022" max="2255"
-                            placeholder="e.g. 2028">
-                        <div class="form-text text-muted">
-                            Select the year when the program must be revisited.
                         </div>
-                    </div>
 
-                    {{-- COMMENTS --}}
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Comments / Justification</label>
-                        <textarea class="form-control" id="fvComments" rows="4" placeholder="Provide justification for your decision..."
-                            required></textarea>
-                    </div>
-
-                    <div class="alert alert-warning small mt-3">
-                        ⚠️ This action finalizes the accreditation evaluation.
-                    </div>
-
+                    @empty
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-body empty-state">
+                                    <i class="bx bx-folder-open"></i>
+                                    No programs available for this level.
+                                </div>
+                            </div>
+                        </div>
+                    @endforelse
                 </div>
 
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        Submit Final Verdict
-                    </button>
+            </div>
+        @endforeach
+    @endif
+
+</div>
+
+{{-- ===== FINAL VERDICT MODAL ===== --}}
+<div class="modal fade" id="finalVerdictModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="finalVerdictForm" class="modal-content">
+
+            <input type="hidden" id="fvProgramId">
+            <input type="hidden" id="fvAccredInfoId">
+            <input type="hidden" id="fvLevelId">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Final Accreditation Verdict</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Submitting the final accreditation decision for:
+                    <strong id="fvProgram" class="text-dark d-block mt-1"></strong>
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Accreditation Status</label>
+                    <select class="form-select" id="fvStatus" required>
+                        <option value="" selected disabled>Select status</option>
+                        <option value="revisit">Revisit</option>
+                        <option value="completed">Completed / Granted</option>
+                    </select>
                 </div>
 
-            </form>
-        </div>
+                <div class="mb-3 d-none" id="revisitYearContainer">
+                    <label class="form-label fw-semibold">Revisit Until (Year)</label>
+                    <input type="number"
+                           class="form-control"
+                           id="fvRevisitYear"
+                           min="2022" max="2255"
+                           placeholder="e.g. 2028">
+                    <div class="form-text text-muted">
+                        Year by which the program must be revisited.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Comments / Justification</label>
+                    <textarea class="form-control"
+                              id="fvComments"
+                              rows="4"
+                              placeholder="Provide justification for your decision..."
+                              required></textarea>
+                </div>
+
+                <div class="alert alert-warning small mb-0">
+                    <i class="bx bx-error me-1"></i>
+                    This action finalizes the accreditation evaluation and cannot be undone.
+                </div>
+            </div>
+
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bx bx-check-shield me-1"></i> Submit Final Verdict
+                </button>
+            </div>
+
+        </form>
     </div>
-
+</div>
 
 @endsection
+
 @push('scripts')
-    <script>
-        /* ================= FINAL VERDICT MODAL ================= */
+<script>
+$(function () {
 
-        $(document).on('click', '.open-final-verdict', function () {
-
-    $('#fvProgram').text($(this).data('program'));
-
-    $('#fvProgramId').val($(this).data('program-id'));
-    $('#fvAccredInfoId').val($(this).data('accred-info-id'));
-    $('#fvLevelId').val($(this).data('level-id'));
-
-    $('#fvStatus').val('');
-    $('#fvComments').val('');
-    $('#fvRevisitYear').val('');
-    $('#revisitYearContainer').addClass('d-none');
-
-    $('#finalVerdictModal').modal('show');
-});
-
+    $(document).on('click', '.open-final-verdict', function () {
+        $('#fvProgram').text($(this).data('program'));
+        $('#fvProgramId').val($(this).data('program-id'));
+        $('#fvAccredInfoId').val($(this).data('accred-info-id'));
+        $('#fvLevelId').val($(this).data('level-id'));
+        $('#fvStatus').val('');
+        $('#fvComments').val('');
+        $('#fvRevisitYear').val('');
+        $('#revisitYearContainer').addClass('d-none');
+        $('#finalVerdictModal').modal('show');
+    });
 
     $('#fvStatus').on('change', function () {
-    if ($(this).val() === 'revisit') {
-        $('#revisitYearContainer').removeClass('d-none');
-        $('#fvRevisitYear').prop('required', true);
-    } else {
-        $('#revisitYearContainer').addClass('d-none');
-        $('#fvRevisitYear').val('').prop('required', false);
-    }
-});
+        const isRevisit = $(this).val() === 'revisit';
+        $('#revisitYearContainer').toggleClass('d-none', !isRevisit);
+        $('#fvRevisitYear').prop('required', isRevisit);
+        if (!isRevisit) $('#fvRevisitYear').val('');
+    });
 
+    $('#finalVerdictForm').on('submit', function (e) {
+        e.preventDefault();
 
-        /* Submit (UI ONLY) */
-        $('#finalVerdictForm').on('submit', function(e) {
-            e.preventDefault();
+        if (!$('#fvStatus').val() || !$('#fvComments').val().trim()) {
+            showToast('Please complete all required fields.', 'error');
+            return;
+        }
 
-            if (!$('#fvStatus').val() || !$('#fvComments').val().trim()) {
-                alert('Please complete all required fields.');
-                return;
+        $.ajax({
+            url: "{{ route('internal.final.verdict.store') }}",
+            method: 'POST',
+            data: {
+                _token: "{{ csrf_token() }}",
+                program_id:     $('#fvProgramId').val(),
+                accred_info_id: $('#fvAccredInfoId').val(),
+                level_id:       $('#fvLevelId').val(),
+                status:         $('#fvStatus').val(),
+                revisit_year:   $('#fvRevisitYear').val(),
+                comments:       $('#fvComments').val()
+            },
+            success: function () {
+                $('#finalVerdictModal').modal('hide');
+                showToast('Final verdict saved successfully.', 'success');
+                location.reload();
+            },
+            error: function () {
+                showToast('Failed to save final verdict.', 'error');
             }
-
-            $.ajax({
-                url: "{{ route('internal.final.verdict.store') }}",
-                method: "POST",
-                data: {
-                    _token: "{{ csrf_token() }}",
-                    program_id: $('#fvProgramId').val(),
-                    accred_info_id: $('#fvAccredInfoId').val(),
-                    level_id: $('#fvLevelId').val(),
-                    status: $('#fvStatus').val(),
-                    comments: $('#fvComments').val()
-                },
-                success: function() {
-                    $('#finalVerdictModal').modal('hide');
-                    showToast('Final verdict saved successfully.', 'success');
-                    location.reload(); // refresh to reflect status
-                },
-                error: function() {
-                    showToast('Failed to save final verdict.', 'danger');
-                }
-            });
         });
-    </script>
+    });
+
+});
+</script>
 @endpush

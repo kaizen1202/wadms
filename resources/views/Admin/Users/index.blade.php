@@ -9,22 +9,14 @@
 
 @section('contents')
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.2/semantic.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/2.3.5/css/dataTables.semanticui.css">
+<link rel="stylesheet" href="{{ asset('assets/css/semantic.min.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/css/data-tables.semanticui.css') }}">
 
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 <div class="container-xxl flex-grow-1 container-p-y bg-footer-theme">
+    <h2 class="fw-bold">Pending Accounts</h2>
     <div class="card">
-        <div class="card-header">
-            <h5>
-                {{ 
-                    $isAdmin 
-                    ? 'Pending Internal Assessors and Accreditors Account'
-                    : 'Pending Task Forces Account'
-                }}
-            </h5>
-        </div>
 
         <div class="card-body">
             <table id="users-table" class="table table-bordered table-striped w-100">
@@ -132,8 +124,8 @@
 
 @push('scripts')
 
-<script src="https://cdn.datatables.net/2.3.5/js/dataTables.js"></script>
-<script src="https://cdn.datatables.net/2.3.5/js/dataTables.semanticui.js"></script>
+<script src="{{ asset('assets/js/data-tables.js') }}"></script>
+<script src="{{ asset('assets/js/data-tables.semanticui.js') }}"></script>
 
 <script>
 $(function () {

@@ -1,166 +1,127 @@
 @extends('admin.layouts.master')
 
 @section('contents')
-<style>
-    .assigned-users {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 10px;
-    }
-
-    .avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: #e5e7eb;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        color: #1e40af;
-        font-size: 13px;
-        margin-left: -10px;
-        border: 2px solid #fff;
-    }
-
-    .avatar:first-child {
-        margin-left: 0;
-    }
-
-    .avatar.more {
-        background: #2563eb;
-        color: #fff;
-    }
-
-    .status-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .status-not_started { background: #6b7280; color: #fff; }
-    .status-ongoing     { background: #f59e0b; color: #fff; }
-    .status-completed   { background: #16a34a; color: #fff; }
-
-    .view-eval-btn {
-        margin-top: 10px;
-        font-size: 13px;
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-weight: 600;
-    }
-</style>
-
 <div class="container-xxl container-p-y">
 
-    {{-- HEADER --}}
-    <div class="mb-4">
-        <h4>
-            <span class="text-muted fw-light">
-                Internal Assessor /
-            </span>
-            {{ $programName }} – Areas
-        </h4>
+    {{-- ===== PAGE HEADER ===== --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item">
+                        <a href="{{ url()->previous() }}" class="text-muted">Accreditation</a>
+                    </li>
+                    <li class="breadcrumb-item active">Areas</li>
+                </ol>
+            </nav>
+            <h4 class="fw-bold mb-0">{{ $programName }}</h4>
+            <small class="text-muted">
+                <i class="bx bx-layer me-1"></i>Program Areas
+            </small>
+        </div>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bx bx-arrow-back me-1"></i> Back
+        </a>
     </div>
 
-    {{-- PROGRAM CARD --}}
-    <div class="card shadow-sm">
-        <div class="card-header">
-            <h5 class="mb-0 fw-bold text-center">
-                {{ $programName }}
-            </h5>
-        </div>
+    {{-- ===== AREA CARDS ===== --}}
+    <div class="row g-3">
+        @forelse ($programAreas as $mapping)
+            @php
+                $evaluation   = $mapping->evaluations->first();
+                $status       = $evaluation->status ?? 'not_started';
+                $evaluatorName = $evaluation?->files->first()?->uploader?->name;
 
-        <div class="card-body">
-            <p class="text-muted text-center mb-4">
-                Select an area to proceed with evaluation.
-            </p>
+                $badgeClass = match($status) {
+                    'completed'  => 'bg-success',
+                    'ongoing'    => 'bg-warning text-dark',
+                    default      => 'bg-secondary',
+                };
 
-            <div class="row g-3">
-                @forelse($programAreas as $mapping)
+                $statusLabel = ucfirst(str_replace('_', ' ', $status));
+            @endphp
 
-                    @php
-                        // Latest evaluation (loaded in backend)
-                        $evaluation = $mapping->evaluations->first();
+            <div class="col-md-4">
+                <div class="card area-card h-100 shadow-sm d-flex flex-column"
+                     style="border-radius: 10px; border-color: #e2e8f0;">
 
-                        $status = $evaluation->status ?? 'not_started';
+                    <a href="{{ route('program.areas.evaluation', [$infoId, $levelId, $programId, $mapping->id]) }}"
+                       class="text-decoration-none flex-grow-1 d-flex flex-column">
 
-                        $statusClass = match($status) {
-                            'completed' => 'status-completed',
-                            'ongoing' => 'status-ongoing',
-                            default => 'status-not_started'
-                        };
+                        {{-- Card Header --}}
+                        <div class="area-header">
+                            <div class="area-title">Area</div>
+                            <div class="area-name">{{ $mapping->area->area_name }}</div>
+                            <span class="area-badge">
+                                <i class="bx bx-user bx-xs"></i>
+                                {{ $mapping->users->count() }} assigned
+                            </span>
+                        </div>
 
-                        // Internal assessor name (from uploaded file)
-                        $evaluatorName = $evaluation?->files->first()?->uploader?->name;
-                    @endphp
+                        {{-- Card Body --}}
+                        <div class="area-body">
 
-                    <div class="col-md-4">
-                        <a href="{{ route(
-                            'program.areas.evaluation',
-                            [$infoId, $levelId, $programId, $mapping->id]
-                        ) }}"
-                           class="text-decoration-none text-dark">
-
-                            <div class="card h-100 shadow-sm">
-
-                                {{-- AREA HEADER --}}
-                                <div class="text-white text-center py-2 fw-bold rounded-top bg-primary">
-                                    {{ $mapping->area->area_name }}
-                                </div>
-
-                                <div class="card-body text-center">
-
-                                    {{-- ASSIGNED USERS --}}
-                                    <div class="assigned-users">
-                                        @foreach ($mapping->users->take(3) as $user)
-                                            <div class="avatar">
-                                                {{ strtoupper(substr($user->name, 0, 2)) }}
+                            {{-- Avatar stack --}}
+                            @if ($mapping->users->count() > 0)
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="avatar-stack">
+                                        @foreach ($mapping->users->take(4) as $user)
+                                            <div class="av" title="{{ $user->name }}">
+                                                <x-initials-avatar :user="$user" size="xs" shape="circle" />
                                             </div>
                                         @endforeach
-
-                                        @if ($mapping->users->count() > 3)
-                                            <div class="avatar more">
-                                                +{{ $mapping->users->count() - 3 }}
-                                            </div>
+                                        @if ($mapping->users->count() > 4)
+                                            <div class="av av-more">+{{ $mapping->users->count() - 4 }}</div>
                                         @endif
                                     </div>
-
-                                    {{-- STATUS --}}
-                                    <div class="mb-2">
-                                        <span class="status-badge {{ $statusClass }}">
-                                            {{ str_replace('_', ' ', ucfirst($status)) }}
-                                        </span>
-                                    </div>
-
-                                    {{-- EVALUATED BY --}}
-                                    <small class="text-muted d-block mb-2">
-                                        Evaluated by:
-                                        <strong>
-                                            {{ $evaluatorName ?? '—' }}
-                                        </strong>
-                                    </small>
+                                    <span class="assigned-label">
+                                        {{ $mapping->users->first()?->name }}
+                                        @if ($mapping->users->count() > 1)
+                                            & {{ $mapping->users->count() - 1 }} more
+                                        @endif
+                                    </span>
                                 </div>
+                            @else
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <div class="av av-empty">
+                                        <i class="bx bx-user-x" style="font-size:0.9rem;"></i>
+                                    </div>
+                                    <span class="no-users-text">No users assigned yet</span>
+                                </div>
+                            @endif
+
+                            {{-- Evaluation status --}}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge {{ $badgeClass }}">
+                                    {{ $statusLabel }}
+                                </span>
+                                @if ($evaluatorName)
+                                    <small class="text-muted" style="font-size: 11px;">
+                                        <i class="bx bx-user me-1"></i>{{ $evaluatorName }}
+                                    </small>
+                                @endif
                             </div>
-                        </a>
-                    </div>
 
-                @empty
-                    <div class="col-12 text-center">
-                        <p class="text-muted fst-italic">
-                            {{ 
-                                $isInternalAssessor || $isTaskForce
-                                ? 'No areas assigned for you yet.'
-                                : 'No areas available for this program.'
-                            }}
-                        </p>
-                    </div>
-                @endforelse
+                        </div>
+                    </a>
 
+                </div>
             </div>
-        </div>
+
+        @empty
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body empty-state">
+                        <i class="bx bx-layer"></i>
+                        {{
+                            $isInternalAssessor || $isTaskForce
+                                ? 'No areas assigned to you yet.'
+                                : 'No areas available for this program.'
+                        }}
+                    </div>
+                </div>
+            </div>
+        @endforelse
     </div>
 </div>
 @endsection

@@ -14,7 +14,7 @@
         content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
     />
 
-    <title>Sign In - CGS</title>
+    <title>Sign In</title>
     <meta name="description" content="" />
 
     <!-- Favicon -->
@@ -64,8 +64,8 @@
                                          class="w-px-40 h-auto" />
                                 </span>
                                 
+                                <span class="app-brand-text demo text-body fw-bold ms-2 text-uppercase">PIT</span>
                             </a>
-                            <span class="app-brand-text demo text-body fw-bold ms-2 text-uppercase">PIT</span>
                         </div>
                         <!-- /Logo -->
 

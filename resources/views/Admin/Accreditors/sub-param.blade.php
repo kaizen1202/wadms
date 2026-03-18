@@ -5,13 +5,27 @@
 @php
     use App\Enums\UserType;
     $user = auth()->user();
+    $isAdmin = $user->currentRole->name === UserType::ADMIN->value;
+    $isIA = $user->currentRole->name === UserType::INTERNAL_ASSESSOR->value;
+
+    $routeParams = [
+        'infoId' => $infoId,
+        'levelId' => $levelId,
+        'programId' => $programId,
+        'programAreaId' => $programAreaId
+    ];
+
+    // Determine back URL
+    $backUrl = $isIA
+        ? route('program.areas.evaluation', $routeParams)
+        : route('program.areas.parameters', $routeParams);
 @endphp
 
     <div class="container-xxl container-p-y">
 
         {{-- Breadcrumb --}}
         <div class="mb-3">
-            <a href="{{ url()->previous() }}" class="btn btn-sm btn-outline-secondary">
+            <a href="{{ $backUrl }}" class="btn btn-sm btn-outline-secondary">
                 ← Back
             </a>
         </div>
@@ -26,8 +40,8 @@
         
         {{-- Upload Card --}}
         <div class="card mb-4">
-            @if ($user->user_type === UserType::DEAN 
-                    || $user->user_type === UserType::TASK_FORCE
+            @if ($user->currentRole->name === UserType::DEAN->value
+                    || $user->currentRole->name === UserType::TASK_FORCE->value
                 )
                 <div class="card-body">
                     <form
@@ -74,7 +88,7 @@
                             <th>File Name</th>
                             <th>Type</th>
                             <th>Uploaded By</th>
-                            <th>User Type</th>
+                            <th>Uploader Role</th>
                             <th>Uploaded At</th>
                             <th>Action</th>
                         </tr>
@@ -95,7 +109,7 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-label-info">
-                                        {{ ucfirst($upload->uploader?->user_type?->value ?? 'N/A') }}
+                                        {{ ucfirst($upload->uploaderRole->name ?? 'N/A') }}
                                     </span>
                                 </td>
                                 <td>{{ $upload->created_at->format('M d, Y') }}</td>
@@ -106,19 +120,21 @@
                                     target="_blank"
                                     class="btn btn-sm btn-outline-primary">
                                         <i class="bx bx-show"></i>
+                                        View
                                     </a>
 
                                     {{-- DELETE (only uploader can delete) --}}
-                                    @if ($upload->uploader && $upload->uploader->id === auth()->id())
-                                        <form action="{{ route('subparam.uploads.destroy', $upload->id) }}"
-                                            method="POST">
-                                            @csrf
-                                            @method('DELETE')
-
-                                            <button class="btn btn-sm btn-outline-danger">
-                                                <i class="bx bx-trash"></i>
-                                            </button>
-                                        </form>
+                                    @if ($upload->uploader && $upload->uploader->id === auth()->id() && $upload->uploaderRole->id === auth()->user()->current_role_id)
+                                        <button 
+                                            class="btn btn-sm btn-outline-danger btn-delete"
+                                            data-id="{{ $upload->id }}"
+                                            data-url="{{ route('subparam.uploads.destroy', $upload->id) }}"
+                                            data-name="{{ $upload->file_name }}"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteModal">
+                                            <i class="bx bx-trash"></i>
+                                            Delete
+                                        </button>
                                     @endif
                                 </td>
                             </tr>
@@ -134,4 +150,64 @@
             </div>
         </div>
     </div>
+    {{-- DELETE CONFIRMATION MODAL --}}
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="deleteForm" method="POST">
+                    @csrf
+                    @method('DELETE')
+
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">
+                            Confirm Delete
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <p>
+                            Are you sure you want to delete <strong id="fileName"></strong> file?
+                        </p>
+                        
+                        <p class="text-danger mt-2 mb-0">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" 
+                                class="btn btn-secondary" 
+                                data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+                        <button type="submit" 
+                                class="btn btn-danger">
+                            Yes, Delete
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+@push('scripts')
+<script>
+$(document).ready(function () {
+
+    $('#deleteModal').on('show.bs.modal', function (event) {
+
+        let button = $(event.relatedTarget); // Button that triggered modal
+        let url = button.data('url');        // Get delete URL
+        let name = button.data('name');      // Get file name
+
+        $('#deleteForm').attr('action', url); // Set form action
+        $('#fileName').text(name);            // Set file name text
+
+    });
+
+});
+</script>
+@endpush
 @endsection

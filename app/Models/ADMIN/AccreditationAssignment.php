@@ -3,6 +3,7 @@
 namespace App\Models\ADMIN;
 
 use App\Enums\TaskForceRole;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,6 +11,7 @@ class AccreditationAssignment extends Model
 {
      protected $fillable = [
         'user_id',
+        'role_id',
         'role',
         'accred_info_id',
         'level_id',
@@ -20,6 +22,11 @@ class AccreditationAssignment extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class, 'role_id');
     }
 
     public function area()

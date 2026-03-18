@@ -8,7 +8,10 @@
             {{-- PAGE HEADER WITH BACK BUTTON --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
-                    <span class="text-muted fw-light">Users /</span> View User
+                    <a href="{{ route('users.taskforce.index') }}">
+                        <span class="text-muted fw-light">Users</span>
+                    </a> 
+                    / Detail
                 </h4>
 
                 <a href="{{ route('users.taskforce.index') }}" class="btn btn-outline-primary">
@@ -151,11 +154,11 @@
                                     </div>
 
                                    <button
-    class="btn btn-danger btn-terminate"
-    data-id="{{ $user->id }}"
-    data-url="{{ url('/users/' . $user->id . '/suspend') }}">
-    <i class="bx bx-trash me-1"></i> Terminate User
-</button>
+                                        class="btn btn-danger btn-terminate"
+                                        data-id="{{ $user->id }}"
+                                        data-url="{{ url('/users/' . $user->id . '/suspend') }}">
+                                        <i class="bx bx-trash me-1"></i> Terminate User
+                                    </button>
 
                                 </div>
                             </div>
@@ -316,12 +319,6 @@
                                                                                             @endif
                                                                                         </div>
 
-                                                                                        <button class="btn btn-sm btn-outline-primary mt-2"
-                                                                                            data-bs-toggle="collapse"
-                                                                                            data-bs-target="#evaluation-{{ $areaId }}">
-                                                                                            <i class="bx bx-show me-1"></i> View Evaluation
-                                                                                        </button>
-
                                                                                         {{-- UPDATED INFO --}}
                                                                                         @if ($evaluation && ($evaluation['is_updated'] ?? false))
                                                                                             <p class="text-muted small mb-2">
@@ -377,7 +374,6 @@
                                             @endforeach
 
                                         </div> {{-- END ACCORDION --}}
-
                                     @endif
                                 </div>
                             </div>

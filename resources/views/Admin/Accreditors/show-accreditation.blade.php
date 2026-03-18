@@ -5,15 +5,14 @@
 
     {{-- ================= HEADER ================= --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4>
-            <span class="text-muted fw-light">Admin / Accreditation /</span>
-            View Details
-        </h4>
+        <h2>
+            <a href="{{ route('admin.accreditation.index') }}">
+                <span class="text-muted fw-light">Accreditation</span>
+            </a>
+            / View Details
+        </h2>
 
         <div class="d-flex gap-2">
-            <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">
-                <i class="bx bx-arrow-back me-1"></i> Back
-            </a>
             @if ($isAdmin)
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editAccreditationModal">
                     <i class="bx bx-edit me-1"></i> Edit Accreditation
@@ -126,7 +125,7 @@
                                 </span>
                                 <span class="badge bg-label-primary ms-3 programs-count-badge"
                                     data-level-id="{{ $level->id }}">
-                                    {{ $items->count() }} Programs
+                                    {{ $items->count() }} {{ Str::plural('Program', $items->count()) }}
                                 </span>
                             </button>
                         </h2>
@@ -137,28 +136,25 @@
                                 {{-- PROGRAM LIST --}}
                                 <div class="list-group list-group-flush">
                                     @foreach($items as $mapping)
-                                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                                            <span>{{ $mapping->program->program_name }}</span>
-
+                                        <div class="list-group-item d-flex justify-content-between align-items-center program-row">
+                                            <a href="{{ route('admin.accreditations.program', [
+                                                'infoId' => $accreditation->id,
+                                                'levelId' => $level->id,
+                                                'programName' => $mapping->program->program_name
+                                            ]) }}"
+                                            title="View Areas">
+                                            
+                                                <span>{{ $mapping->program->program_name }}</span>
+                                            </a>
+                                            
                                             <div class="d-flex gap-2">
-                                                <a href="{{ route('admin.accreditations.program', [
-                                                        'infoId' => $accreditation->id,
-                                                        'levelId' => $level->id,
-                                                        'programName' => $mapping->program->program_name
-                                                    ]) }}"
-                                                    class="btn btn-xs btn-outline-info"
-                                                    data-bs-toggle="tooltip"
-                                                    title="View Areas">
-                                                    <i class="bx bx-sitemap"></i>
-                                                    {{ !$isAdmin ? 'View Areas' : '' }}
-                                                </a>
-
                                                 @if ($isAdmin)
                                                     <button class="btn btn-xs btn-outline-primary edit-program-btn"
                                                             title="Edit Program"
                                                             data-mapping-id="{{ $mapping->id }}"
                                                             data-current-name="{{ $mapping->program->program_name }}">
                                                         <i class="bx bx-edit"></i>
+                                                        Edit
                                                     </button>
 
                                                     <button type="button"
@@ -167,6 +163,7 @@
                                                             data-mapping-id="{{ $mapping->id }}"
                                                             data-program-name="{{ $mapping->program->program_name }}">
                                                         <i class="bx bx-trash"></i>
+                                                        Delete
                                                     </button>
                                                 @endif
                                             </div>
@@ -417,12 +414,14 @@ $(document).ready(function () {
                                     data-mapping-id="${res.data.mapping_id}"
                                     data-current-name="${res.data.program_name}">
                                 <i class="bx bx-edit"></i>
+                                Edit
                             </button>
 
                             <button class="btn btn-xs btn-outline-danger delete-program-btn"
                                     data-mapping-id="${res.data.mapping_id}"
                                     data-program-name="${res.data.program_name}">
                                 <i class="bx bx-trash"></i>
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -490,6 +489,15 @@ $(document).ready(function () {
         $('#deleteProgramMappingId').val($(this).data('mapping-id'));
         $('#deleteProgramName').text($(this).data('program-name'));
         $('#deleteProgramModal').modal('show');
+    });
+
+    $(document).on('click', '.edit-program-btn, .delete-program-btn', function (e) {
+        e.stopPropagation(); // prevent parent <a> click
+    });
+
+    $(document).on('click', '.program-row', function () {
+        const link = $(this).find('a').attr('href');
+        if(link) window.location.href = link;
     });
 
     // ================= CONFIRM DELETE PROGRAM =================

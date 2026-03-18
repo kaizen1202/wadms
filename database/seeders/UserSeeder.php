@@ -4,81 +4,67 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Create Admin/IQA Account
-        User::create([
-            'name' => 'Jiv Codera',
-            'email' => 'jiv@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'ADMIN',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
+        // Define manual users
+        $manualUsers = [
+            ['name' => 'Jiv Codera', 'email' => 'jiv@example.com', 'user_type' => 'ADMIN'],
+            ['name' => 'Jennifer Gorumba', 'email' => 'jennifer@example.com', 'user_type' => 'DEAN'],
+            ['name' => 'Geryl Cataraja', 'email' => 'geryl@example.com', 'user_type' => 'TASK FORCE'],
+            ['name' => 'Ruby Mary G. Encenzo', 'email' => 'ruby@example.com', 'user_type' => 'TASK FORCE'],
+            ['name' => 'Levi Esmero', 'email' => 'levi@example.com', 'user_type' => 'INTERNAL ASSESSOR'],
+            ['name' => 'Janet Aclao', 'email' => 'janet@example.com', 'user_type' => 'ACCREDITOR'],
+        ];
 
-        // Create Dean (ACTIVE)
-        User::create([
-            'name' => 'Jennifer Gorumba',
-            'email' => 'jennifer@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'DEAN',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
+        // Create manual users and attach role
+        foreach ($manualUsers as $userData) {
+            $user = User::create([
+                'name' => $userData['name'],
+                'email' => $userData['email'],
+                'password' => Hash::make('password'),
+                'user_type' => $userData['user_type'],
+                'status' => 'Active',
+                'email_verified_at' => now(),
+            ]);
 
-        // Create Task Force
-        User::create([
-            'name' => 'Geryl Cataraja',
-            'email' => 'geryl@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'TASK FORCE',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
+            // Find role by name and attach to pivot
+            $role = Role::firstWhere('name', $user->user_type);
+            if ($role) {
+                $user->roles()->attach([$role->id]);
 
-        User::create([
-            'name' => 'Ruby Mary G. Encenzo',
-            'email' => 'ruby@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'TASK FORCE',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
+                $user->current_role_id = $role->id;
+                $user->save();
+            }
+        }
 
-        // Create Internal Assessor (ACTIVE)
-        User::create([
-            'name' => 'Levi Esmero',
-            'email' => 'levi@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'INTERNAL ASSESSOR',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
+        // Define factories to generate multiple users
+        $factoryUsers = [
+            ['user_type' => 'TASK FORCE', 'count' => 10],
+            ['user_type' => 'INTERNAL ASSESSOR', 'count' => 10],
+        ];
 
-        // Create Accreditor (ACTIVE)
-        User::create([
-            'name' => 'Janet Aclao',
-            'email' => 'janet@example.com',
-            'password' => Hash::make('password'),
-            'user_type' => 'ACCREDITOR',
-            'status' => 'Active',
-            'email_verified_at' => now(),
-        ]);
-        
-        // Create 10 Task Force users
-        User::factory()->count(10)->create([
-            'user_type' => 'TASK FORCE',
-            'status' => 'Active',
-        ]);
+        // Create factory users and attach pivot roles
+        foreach ($factoryUsers as $factoryData) {
+            User::factory()
+                ->count($factoryData['count'])
+                ->create([
+                    'user_type' => $factoryData['user_type'],
+                    'status' => 'Active',
+                ])
+                ->each(function ($user) {
+                    $role = Role::firstWhere('name', $user->user_type);
+                    if ($role) {
+                        $user->roles()->attach([$role->id]);
 
-        // Create 10 Internal Assessor users
-        User::factory()->count(10)->create([
-            'user_type' => 'INTERNAL ASSESSOR',
-            'status' => 'Active',
-        ]);
+                        $user->current_role_id = $role->id;
+                        $user->save();
+                    }
+                });
+        }
     }
 }

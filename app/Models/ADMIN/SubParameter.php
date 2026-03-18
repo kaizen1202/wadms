@@ -29,7 +29,7 @@ class SubParameter extends Model
 {
     return $this->hasMany(
         AccreditationDocuments::class,
-        'subparameter_id' // ✅ REAL COLUMN
+        'subparameter_id' 
     );
 }
 

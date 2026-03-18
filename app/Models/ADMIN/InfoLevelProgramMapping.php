@@ -42,6 +42,16 @@ class InfoLevelProgramMapping extends Model
         return $this->hasMany(ProgramAreaMapping::class, 'info_level_program_mapping_id');
     }
 
+    public function areas()
+    {
+        return $this->belongsToMany(
+            Area::class,
+            'program_area_mappings',
+            'info_level_program_mapping_id',
+            'area_id'
+        );
+    }
+
     public function deletedBy()
     {
         return $this->belongsTo(User::class, 'deleted_by');
