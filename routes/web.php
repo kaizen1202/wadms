@@ -40,7 +40,8 @@ Route::middleware('auth')->group(function () {
         ->name('users.data');
     Route::post('/users/{id}/verify', [AdminUserController::class, 'verify'])
      ->name('users.verify');
-    Route::patch('/users/{id}/suspend', [AdminUserController::class, 'suspend']);
+    Route::patch('/users/{id}/suspend', [AdminUserController::class, 'suspend'])
+    ->name('users.suspend');
     Route::get('/task-force', [AdminTaskForceController::class, 'index'])
         ->name('users.taskforce.index');
     Route::get('/task-force/data', [AdminTaskForceController::class, 'data'])
@@ -281,6 +282,9 @@ Route::middleware(['auth'])->group(function () {
         'assignments/unassign/{assignment}',
         [AssignmentController::class, 'destroy']
     )->name('assignments.unassign');
+
+    Route::get('/documents/{upload}/view', [AdminAcreditationController::class, 'viewDocument'])
+        ->name('document.view');
 });
 
 // Route for global search
@@ -291,5 +295,9 @@ Route::get('/global-search', [SearchController::class, 'global'])
 // Route for privacy policy and terms and conditions
 Route::view('/privacy-policy', 'privacy-policy')->name('privacy');
 Route::view('/terms-and-conditions', 'terms-and-conditions')->name('terms');
+
+Route::get('/documents/{upload}/view', [AdminAcreditationController::class, 'viewDocument'])
+    ->name('document.view')
+    ->middleware('auth');
 
 require __DIR__ . '/auth.php';

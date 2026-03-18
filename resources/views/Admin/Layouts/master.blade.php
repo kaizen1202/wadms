@@ -29,8 +29,6 @@
     <link rel="stylesheet" href="{{ asset('assets/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/vendor/libs/apex-charts/apex-charts.css') }}" />
-    @vite('resources/css/accreditation.css')
-    @vite('resources/css/global-search.css')
 
     <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
     <script src="{{ asset('assets/js/config.js') }}"></script>
@@ -299,6 +297,8 @@ Vue.component('global-search', {
                                 <a v-for="item in group.items"
                                     :key="item.id"
                                     :href="item.url"
+                                    :target="item.type === 'document' ? '_blank' : '_self'"
+                                    :rel="item.type === 'document' ? 'noopener noreferrer' : ''"
                                     class="gs-result">
 
                                     <!-- Icon box -->

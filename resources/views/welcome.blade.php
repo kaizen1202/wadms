@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>WADMS</title>
+    <link rel="icon" type="image/x-icon" href="{{ asset('assets/img/favicon/favicon.ico') }}" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">

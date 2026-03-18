@@ -320,9 +320,9 @@
 @if (!$isCompleted)
 
     {{-- ================= ASSIGN USER MODAL ================= --}}
-    <div class="modal fade" id="assignUserModal" tabindex="-1">
+    <div class="modal fade" id="assignUserModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg" style="border-radius:12px; overflow:hidden;">
+            <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0">
                     <div>
                         <h5 class="modal-title fw-bold mb-0">
@@ -330,7 +330,7 @@
                         </h5>
                         <small class="text-muted">{{ $programArea->area->area_name }}</small>
                     </div>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                    <button class="btn-close align-self-start" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     @if($isAdmin)
@@ -402,9 +402,26 @@
                     @csrf
                     <input type="hidden" name="area_id" value="{{ $programArea->area->id }}">
                     <div class="modal-body">
-                        <div id="parametersContainer"></div>
+                        <div id="parametersContainer">
+                            {{-- First parameter block rendered by default --}}
+                            <div class="parameter-block mb-3 border rounded p-3" data-id="1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <input type="text" name="parameters[1][name]" class="form-control me-2"
+                                        placeholder="Parameter Name" required>
+                                    <button type="button" class="btn btn-outline-danger remove-parameter"
+                                        title="Remove" disabled>
+                                        <i class="bx bx-x"></i>
+                                    </button>
+                                </div>
+                                <div class="subparams-container ps-4" data-parameter-id="1"></div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm add-subparam mt-2"
+                                    data-parameter-id="1">
+                                    <i class="bx bx-plus-circle me-1"></i> Add Sub-Parameter
+                                </button>
+                            </div>
+                        </div>
                         <button type="button" class="btn btn-outline-primary btn-sm mt-3" id="addParameterBtn">
-                            <i class="bx bx-plus-circle me-1"></i> Add Parameter
+                            <i class="bx bx-plus-circle me-1"></i> Add Another Parameter
                         </button>
                     </div>
                     <div class="modal-footer">
@@ -773,7 +790,9 @@ $(function () {
     });
 
     const csrfToken = '{{ csrf_token() }}';
-    let parameterCount = 0;
+
+    // Start at 1 since the first block is pre-rendered in the modal
+    let parameterCount = 1;
 
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': csrfToken } });
 
@@ -782,14 +801,22 @@ $(function () {
     // =====================================================
     $(document).on('click', '#addParameterBtn', function () {
         parameterCount++;
+
+        // Enable the remove button on the first block once a second one is added
+        $('#parametersContainer .parameter-block:first-child .remove-parameter').prop('disabled', false);
+
         $('#parametersContainer').append(`
             <div class="parameter-block mb-3 border rounded p-3" data-id="${parameterCount}">
                 <div class="d-flex align-items-center mb-2">
-                    <input type="text" name="parameters[${parameterCount}][name]" class="form-control me-2" placeholder="Parameter Name" required>
-                    <button type="button" class="btn btn-outline-danger remove-parameter"><i class="bx bx-x"></i></button>
+                    <input type="text" name="parameters[${parameterCount}][name]" class="form-control me-2"
+                        placeholder="Parameter Name" required>
+                    <button type="button" class="btn btn-outline-danger remove-parameter" title="Remove">
+                        <i class="bx bx-x"></i>
+                    </button>
                 </div>
                 <div class="subparams-container ps-4" data-parameter-id="${parameterCount}"></div>
-                <button type="button" class="btn btn-outline-secondary btn-sm add-subparam mt-2" data-parameter-id="${parameterCount}">
+                <button type="button" class="btn btn-outline-secondary btn-sm add-subparam mt-2"
+                    data-parameter-id="${parameterCount}">
                     <i class="bx bx-plus-circle me-1"></i> Add Sub-Parameter
                 </button>
             </div>
@@ -802,7 +829,14 @@ $(function () {
         $('#unassignModal').modal('show');
     });
 
-    $(document).on('click', '.remove-parameter', function () { $(this).closest('.parameter-block').remove(); });
+    $(document).on('click', '.remove-parameter', function () {
+        $(this).closest('.parameter-block').remove();
+
+        // Re-disable the remove button if only one block remains
+        if ($('#parametersContainer .parameter-block').length === 1) {
+            $('#parametersContainer .parameter-block:first-child .remove-parameter').prop('disabled', true);
+        }
+    });
 
     $(document).on('click', '.add-subparam', function () {
         const paramId = $(this).data('parameter-id');
@@ -836,6 +870,28 @@ $(function () {
 
     $(document).on('click', '.remove-subparam', function () { $(this).closest('.sub-param-block').remove(); });
     $(document).on('click', '.remove-sub-of-sub-inline', function () { $(this).closest('.input-group').remove(); });
+
+    // Reset modal to a clean single block when closed
+    $('#addParameterModal').on('hidden.bs.modal', function () {
+        parameterCount = 1;
+        $('#parametersContainer').html(`
+            <div class="parameter-block mb-3 border rounded p-3" data-id="1">
+                <div class="d-flex align-items-center mb-2">
+                    <input type="text" name="parameters[1][name]" class="form-control me-2"
+                        placeholder="Parameter Name" required>
+                    <button type="button" class="btn btn-outline-danger remove-parameter"
+                        title="Remove" disabled>
+                        <i class="bx bx-x"></i>
+                    </button>
+                </div>
+                <div class="subparams-container ps-4" data-parameter-id="1"></div>
+                <button type="button" class="btn btn-outline-secondary btn-sm add-subparam mt-2"
+                    data-parameter-id="1">
+                    <i class="bx bx-plus-circle me-1"></i> Add Sub-Parameter
+                </button>
+            </div>
+        `);
+    });
 
     function ajaxFormSubmit(formSelector, url, successMessage, modalToClose = null, method = 'POST') {
         $(document).on('submit', formSelector, function(e) {

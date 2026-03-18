@@ -354,12 +354,12 @@ class DashboardController extends Controller
         $taskForceRoleId        = Role::where('name', UserType::TASK_FORCE->value)->value('id');
 
         $assignments = AccreditationAssignment::with(['area', 'accreditationInfo', 'level', 'program'])
-    ->where('user_id', $user->id)
-    ->where('role_id', $internalAssessorRoleId)
-    ->whereHas('accreditationInfo', fn ($q) =>
-        $q->where('status', AccreditationStatus::ONGOING)
-    )
-    ->get();
+            ->where('user_id', $user->id)
+            ->where('role_id', $taskForceRoleId)
+            ->whereHas('accreditationInfo', fn ($q) =>
+                $q->where('status', AccreditationStatus::ONGOING)
+            )
+            ->get();
 
         $assignedAreaIds = $assignments->pluck('area_id')->unique()->values();
 
@@ -500,12 +500,12 @@ class DashboardController extends Controller
 
         // Get assigned areas for this internal assessor
         $assignments = AccreditationAssignment::with(['area', 'accreditationInfo', 'level', 'program'])
-    ->where('user_id', $user->id)
-    ->where('role_id', $internalAssessorRoleId)
-    ->whereHas('accreditationInfo', fn ($q) =>
-        $q->where('status', AccreditationStatus::ONGOING)
-    )
-    ->get();
+            ->where('user_id', $user->id)
+            ->where('role_id', $internalAssessorRoleId)
+            ->whereHas('accreditationInfo', fn ($q) =>
+                $q->where('status', AccreditationStatus::ONGOING)
+            )
+            ->get();
 
         $assignedAreaIds = $assignments->pluck('area_id')->unique()->values();
 

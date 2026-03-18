@@ -105,6 +105,7 @@ class AdminAcreditationController extends Controller
     {
         $user = auth()->user();
         $isAdmin = $user->user_type === UserType::ADMIN;
+        $isDean = $user->user_type === UserType::DEAN;
         $accreditation = AccreditationInfo::with('accreditationBody')->findOrFail($id);
 
         $levels = InfoLevelProgramMapping::with(['level', 'program'])
@@ -115,7 +116,8 @@ class AdminAcreditationController extends Controller
         return view('admin.accreditors.show-accreditation', [
             'accreditation' => $accreditation,
             'levels' => $levels,
-            'isAdmin' => $isAdmin
+            'isAdmin' => $isAdmin,
+            'isDean' => $isDean,
         ]);
     }
 
@@ -1159,8 +1161,15 @@ class AdminAcreditationController extends Controller
 
         foreach ($request->file('files') as $file) {
 
-            $path = $file->store(
+            $originalName = $file->getClientOriginalName();
+            $nameWithoutExt = pathinfo($originalName, PATHINFO_FILENAME);
+            $extension = $file->getClientOriginalExtension();
+
+            $fileName = $nameWithoutExt . '_' . time() . '.' . $extension;
+
+            $path = $file->storeAs(
                 "accreditation_uploads/{$programAreaId}/{$subParameter->id}",
+                $fileName,
                 'public'
             );
 
@@ -1504,7 +1513,6 @@ class AdminAcreditationController extends Controller
 
         if ($currentUserEvaluation) {
 
-            // ✅ Sub-parameter ratings — prefix with "sub_"
             foreach ($currentUserEvaluation->subparameterRatings as $rating) {
                 $status = $this->mapLabelToStatus($rating->ratingOption->label);
                 if ($status) {
@@ -1515,7 +1523,6 @@ class AdminAcreditationController extends Controller
                 }
             }
 
-            // ✅ Sub-sub-parameter ratings — prefix with "ss_"
             foreach ($currentUserEvaluation->subSubParameterRatings as $rating) {
                 $status = $this->mapLabelToStatus($rating->ratingOption->label);
                 if ($status) {
@@ -1564,6 +1571,7 @@ class AdminAcreditationController extends Controller
             'isFinalized'
         ));
     }
+    
 
     private function mapLabelToStatus(string $label): ?string
     {

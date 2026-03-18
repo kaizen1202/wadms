@@ -31,15 +31,10 @@
                     </button>
                 @endif
 
-                @if ($isAdmin || $isDean)
-                    <form method="POST" action="{{ route('archive.complete', $accreditation) }}"
-                          onsubmit="return confirm('Mark this accreditation as completed? It will be moved to the archive.')">
-                        @csrf
-                        @method('PATCH')
-                        <button type="submit" class="btn btn-outline-success btn-sm">
-                            <i class="bx bx-check-circle me-1"></i> Mark as Completed
-                        </button>
-                    </form>
+                @if ($isAdmin)
+                    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#markCompletedModal">
+                        <i class="bx bx-check-circle me-1"></i> Mark as Completed
+                    </button>
                 @endif
             @endif
         </div>
@@ -231,7 +226,6 @@
 
 {{-- ================= MODALS (hidden when completed) ================= --}}
 @if ($accreditation->status->value !== 'completed')
-
     {{-- EDIT ACCREDITATION MODAL --}}
     <div class="modal fade" id="editAccreditationModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -275,6 +269,34 @@
                     <button class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- MARK AS COMPLETED MODAL --}}
+    <div class="modal fade" id="markCompletedModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('archive.complete', $accreditation) }}">
+                    @csrf
+                    @method('PATCH')
+                    <div class="modal-header">
+                        <h5 class="modal-title text-success">
+                            <i class="bx bx-check-circle me-1"></i> Mark as Completed
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-1">Are you sure you want to mark <strong>{{ $accreditation->title }} {{ $accreditation->year }}</strong> as completed?</p>
+                        <small class="text-muted">This will move it to the archive and all records will become read-only.</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bx bx-check-circle me-1"></i> Yes, Mark as Completed
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 

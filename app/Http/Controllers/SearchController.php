@@ -584,13 +584,7 @@ class SearchController extends Controller
                             . ' · ' . ($d->program?->program_name ?? 'No Program'),
                 badge:      $d->file_type ?? 'File',
                 badgeColor: $this->documentTypeColor($d->file_type),
-                url:        route('subparam.uploads.index', [
-                                'infoId'        => $d->accred_info_id,
-                                'levelId'       => $d->level_id,
-                                'programId'     => $d->program_id,
-                                'programAreaId' => $d->area_id,
-                                'subParameter'  => $d->subparameter_id,
-                            ]),
+                url:        \Illuminate\Support\Facades\Storage::url($d->file_path),
                 icon:       $this->documentIcon($d->file_type),
                 meta: [
                     'file_name'     => $d->file_name,

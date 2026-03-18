@@ -146,17 +146,40 @@
                 </p>
             </div>
 
-            <form action="{{ url('/users/' . $user->id . '/suspend') }}" method="POST">
-                @csrf
-                <button class="btn btn-danger" type="submit">
-                    Terminate Account
-                </button>
-            </form>
+            {{-- Trigger modal instead of direct submit --}}
+            <button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#terminateModal">
+                Terminate Account
+            </button>
+        </div>
+    </div>
+
+    {{-- CONFIRMATION MODAL --}}
+    <div class="modal fade" id="terminateModal" tabindex="-1" aria-labelledby="terminateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-danger">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger" id="terminateModalLabel">
+                        Confirm Account Termination
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1">Are you sure you want to <strong>terminate your account</strong>?</p>
+                    <p class="text-muted mb-0">This will <strong>immediately suspend</strong> your access. This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmTerminateBtn">
+                        Yes, Terminate My Account
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 @push('scripts')
 <script>
+    // Role request form
     $('#role-request-form').on('submit', function(e){
         e.preventDefault();
 
@@ -166,7 +189,6 @@
             data: $(this).serialize(),
             success: function(res){
                 showToast(res.message || 'Role request submitted', 'success');
-
                 location.reload();
             },
             error: function(xhr){
@@ -176,15 +198,44 @@
         });
     });
 
+    // Enable submit button when role is selected
     document.addEventListener('DOMContentLoaded', function () {
         const roleSelect = document.getElementById('roleSelect');
         const submitBtn = document.getElementById('submitBtn');
 
-        roleSelect.addEventListener('change', function () {
-            submitBtn.disabled = this.value === '';
+        if (roleSelect && submitBtn) {
+            roleSelect.addEventListener('change', function () {
+                submitBtn.disabled = this.value === '';
+            });
+        }
+    });
+
+    // Terminate account confirmation
+    document.getElementById('confirmTerminateBtn').addEventListener('click', function () {
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Terminating...';
+
+        $.ajax({
+            url: "{{ route('users.suspend', $user->id) }}",
+            type: "POST",
+            data: {
+                _token: "{{ csrf_token() }}",
+                _method: "PATCH"
+            },
+            success: function(res) {
+                showToast(res.message || 'Account terminated.', 'success');
+                setTimeout(() => location.reload(), 1500);
+            },
+            error: function(xhr) {
+                let msg = xhr.responseJSON?.message || 'Something went wrong.';
+                showToast(msg, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Yes, Terminate My Account';
+                $('#terminateModal').modal('hide');
+            }
         });
     });
 </script>
-
 @endpush
 @endsection
