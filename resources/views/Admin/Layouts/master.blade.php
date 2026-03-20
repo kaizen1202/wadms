@@ -42,6 +42,8 @@
         #layout-menu .menu-sub .menu-item > .menu-link { padding-left: 2rem; }
         #layout-menu .menu-item .badge { font-size: 0.7rem; }
     </style>
+
+    @vite(['resources/css/accreditation.css', 'resources/css/global-search.css'])
 </head>
 
 <body>
@@ -53,24 +55,32 @@
             <!-- Navbar -->
             <nav class="layout-navbar container-xxl navbar navbar-expand-xl navbar-detached align-items-center bg-navbar-theme"
                  id="layout-navbar">
+
+                {{-- Hamburger (mobile only) --}}
                 <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none">
-                    <a class="nav-item nav-link px-0 me-xl-4" href="javascript:void(0)" @click.prevent="toggleSidebar">
+                    <a class="nav-item nav-link px-0 me-xl-4" href="javascript:void(0)" onclick="Helpers.toggleCollapsed()">
                         <i class="bx bx-menu bx-sm"></i>
                     </a>
                 </div>
 
-                <div class="navbar-nav-right d-flex align-items-center" id="navbar-collapse">
+                <div class="navbar-nav-right d-flex align-items-center w-100" id="navbar-collapse">
+
+                    {{-- System Title --}}
                     <div class="navbar-nav align-items-center">
                         <div class="nav-item d-flex align-items-center fw-semibold" style="font-size:0.85rem; letter-spacing:0.3px;">
-                            WEB-BASED ACCREDITATION DOCUMENT MANAGEMENT SYSTEM
+                            <span class="d-none d-xl-inline">WEB-BASED ACCREDITATION DOCUMENT MANAGEMENT SYSTEM</span>
+                            <span class="d-xl-none">WADMS</span>
                         </div>
                     </div>
 
+                    {{-- Search Button --}}
                     @if ($user->status === \App\Enums\UserStatus::ACTIVE->value)
                         <div class="navbar-nav align-items-center ms-auto">
                             <div class="nav-item d-flex align-items-center">
+
+                                {{-- Full button — large screens --}}
                                 <button type="button"
-                                    class="btn btn-primary d-flex align-items-center gap-2 px-3"
+                                    class="btn btn-primary d-none d-xl-flex align-items-center gap-2 px-3"
                                     style="border-radius:8px; min-width:220px; justify-content:space-between;"
                                     @click="$refs.globalSearch.open()">
                                     <div class="d-flex align-items-center gap-2">
@@ -82,9 +92,19 @@
                                         Ctrl K
                                     </kbd>
                                 </button>
+
+                                {{-- Icon-only button — mobile --}}
+                                <button type="button"
+                                    class="btn btn-primary d-xl-none d-flex align-items-center justify-content-center"
+                                    style="border-radius:8px; width:36px; height:36px; padding:0;"
+                                    @click="$refs.globalSearch.open()">
+                                    <i class="bx bx-search"></i>
+                                </button>
+
                             </div>
                         </div>
                     @endif
+
                 </div>
             </nav>
 
@@ -118,6 +138,7 @@
 <script async defer src="{{ asset('assets/js/buttons.js') }}"></script>
 <script src="{{ asset('assets/js/sweetalert.js') }}"></script>
 <script src="{{ asset('assets/js/alpine.js') }}" defer></script>
+
 <script>
 Vue.component('global-search', {
     props: {
@@ -131,10 +152,12 @@ Vue.component('global-search', {
             modalInstance: null,
             searchTimeout: null,
             _searchShortcut: null,
+            isMobile: window.innerWidth < 1200,
         };
     },
     computed: {
         placeholderText() {
+            if (this.isMobile) return 'Search...';
             switch (this.userRole) {
                 @php use App\Enums\UserType; @endphp
                 case '{{ UserType::ADMIN->value }}':
@@ -177,11 +200,14 @@ Vue.component('global-search', {
                 this.open();
             }
         };
-
         window.addEventListener('keydown', this._searchShortcut);
+
+        this._resizeHandler = () => { this.isMobile = window.innerWidth < 1200; };
+        window.addEventListener('resize', this._resizeHandler);
     },
     beforeDestroy() {
         window.removeEventListener('keydown', this._searchShortcut);
+        window.removeEventListener('resize', this._resizeHandler);
     },
     methods: {
         open() {
@@ -200,14 +226,14 @@ Vue.component('global-search', {
         },
         debouncedSearch() {
             if (this.searchTimeout) clearTimeout(this.searchTimeout);
-            if (this.query.length < 0) { this.results = []; return; }
+            if (this.query.length < 1) { this.results = []; return; }
             this.searchTimeout = setTimeout(() => this.performSearch(), 300);
         },
         performSearch() {
             this.loading = true;
             axios.get('{{ route('global.search') }}', { params: { q: this.query } })
                 .then(r  => { this.results = r.data; })
-                .catch(() => { this.results = [];})
+                .catch(() => { this.results = []; })
                 .finally(() => { this.loading = false; });
         },
         highlight(text) {
@@ -220,8 +246,7 @@ Vue.component('global-search', {
                 user: 'text-primary', accreditation: 'text-warning',
                 program: 'text-success', area: 'text-info',
                 parameter: 'text-danger', sub_parameter: 'text-secondary',
-                document: 'text-primary',
-                evaluation: 'text-success',
+                document: 'text-primary', evaluation: 'text-success',
             };
             return map[type] || 'text-primary';
         },
@@ -230,21 +255,21 @@ Vue.component('global-search', {
                 user: '#eef2ff', accreditation: '#fffbea',
                 program: '#edfaf3', area: '#e8f7fb',
                 parameter: '#fdeef0', sub_parameter: '#f4f4f4',
-                document: '#f3f0ff',
-                evaluation: '#edfaf3',
+                document: '#f3f0ff', evaluation: '#edfaf3',
             };
             return map[type] || '#eef0f8';
         }
     },
     template: `
         <div class="modal fade" id="globalSearchModal" ref="modal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog" style="margin-top: 40px; max-width: 1100px;">
-                <div class="modal-content">
+            <div class="modal-dialog gs-modal-dialog">
+                <div class="modal-content gs-modal-content">
 
                     <!-- ── Input Row ── -->
                     <div class="gs-input-row">
                         <i v-if="!loading" class="bx bx-search gs-search-icon"></i>
-                        <div v-else class="spinner-border spinner-border-sm text-muted gs-search-icon"
+                        <div v-else
+                             class="spinner-border spinner-border-sm text-muted gs-search-icon"
                              style="width:1.4rem; height:1.4rem; flex-shrink:0; margin-right:1rem;"></div>
 
                         <input type="text"
@@ -258,11 +283,19 @@ Vue.component('global-search', {
                         <span v-if="query.length > 0" class="gs-clear-btn" @click="clearQuery" title="Clear">
                             <i class="bx bx-x"></i>
                         </span>
-                        <span v-else class="gs-esc-kbd">Esc</span>
+
+                        {{-- Always show Close button on mobile; Esc hint on desktop --}}
+                        <button v-if="query.length === 0"
+                            class="d-sm-none gs-close-btn"
+                            @click="close"
+                            type="button">
+                            Close
+                        </button>
+                        <span class="d-none d-sm-inline gs-esc-kbd">Esc</span>
                     </div>
 
                     <!-- ── Body ── -->
-                    <div style="max-height: 620px; overflow-y: auto;">
+                    <div class="gs-body">
 
                         <!-- Loading -->
                         <div v-if="loading" class="gs-state">
@@ -492,10 +525,14 @@ Vue.component('global-search', {
 
                     <!-- ── Footer ── -->
                     <div class="gs-footer">
-                        <div class="d-flex gap-3">
+                        <div class="d-none d-sm-flex gap-3">
+                            <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+                            <span><kbd>Enter</kbd> open</span>
                             <span><kbd>Esc</kbd> close</span>
                         </div>
-                        <span v-if="results.length > 0">@{{ results.length }} result(s)</span>
+                        <span v-if="results.length > 0" class="gs-result-count">
+                            @{{ results.length }} result(s)
+                        </span>
                     </div>
 
                 </div>
@@ -510,11 +547,6 @@ Vue.component('global-search', {
 <script>
 new Vue({
     el: '#vue-app',
-    methods: {
-        toggleSidebar() {
-            document.body.classList.toggle('layout-menu-expanded');
-        }
-    }
 });
 </script>
 
