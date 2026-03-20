@@ -1,7 +1,7 @@
 @extends('admin.layouts.master')
 
 @section('contents')
-<div id="app" class="container-xxl container-p-y">
+<div class="container-xxl container-p-y">
 
     {{-- ===== PAGE HEADER ===== --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -78,8 +78,9 @@
                 :readonly="{{ $readonly ? 'true' : 'false' }}"
                 :is-submitted="{{ $isSubmitted ? 'true' : 'false' }}"
                 :is-finalized="{{ $isFinalized ? 'true' : 'false' }}"
-                storage-key="area-eval-{{ auth()->id() }}-{{ $programAreaId }}-{{ $levelId }}-{{ $programId }}"
+                :is-draft="{{ $isDraft ? 'true' : 'false' }}"
                 submit-url="{{ route('accreditation-evaluations.store') }}"
+                draft-url="{{ route('accreditation-evaluations.draft') }}"
                 csrf-token="{{ csrf_token() }}"
             ></area-evaluation>
         </div>
@@ -89,141 +90,213 @@
 @endsection
 
 @push('vue-components')
-    {{-- Vue and Component --}}
-<script src="{{ asset('assets/js/vue.js') }}"></script>
 <script>
 Vue.component('area-evaluation', {
     props: {
-        accredInfoId: Number,
-        levelId: Number,
-        programId: Number,
-        programAreaId: Number,
-        parameters: Array,
-        initialEvaluations: Object,
+        accredInfoId:          Number,
+        levelId:               Number,
+        programId:             Number,
+        programAreaId:         Number,
+        parameters:            Array,
+        initialEvaluations:    Object,
         initialRecommendation: String,
-        readonly: Boolean,
-        isSubmitted: Boolean,
-        isFinalized: Boolean,
-        storageKey: String,
-        submitUrl: String,
-        csrfToken: String
+        readonly:              Boolean,
+        isSubmitted:           Boolean,
+        isFinalized:           Boolean,
+        isDraft:               Boolean,
+        submitUrl:             String,
+        draftUrl:              String,
+        csrfToken:             String,
     },
+
     data() {
         return {
-            evaluations: {},
-            recommendation: '',
-            isLocked: this.readonly,
-            saving: false,
-            loaded: false
+            evaluations:      {},
+            recommendation:   '',
+            isLocked:         this.readonly,
+            saving:           false,
+            draftSaving:      false,
+            lastSaved:        null,
+            loaded:           false,
+            autoSaveInterval: null,
         };
     },
+
     computed: {
-        totalSubparameters() {
-            return this.parameters.reduce((acc, p) => acc + p.sub_parameters.length, 0);
+
+        // Count only rateable items:
+        // - sub-params without children → key: "sub_{id}"
+        // - sub-sub-params              → key: "ss_{id}"
+        totalRateable() {
+            let count = 0;
+            this.parameters.forEach(p => {
+                p.sub_parameters.forEach(sub => {
+                    count += sub.has_sub_sub ? sub.sub_sub_parameters.length : 1;
+                });
+            });
+            return count;
         },
+
         isComplete() {
-            return Object.keys(this.evaluations).length === this.totalSubparameters;
+            return Object.keys(this.evaluations).length === this.totalRateable;
         },
+
         totals() {
             let available = 0, inadequate = 0, notAvailable = 0, notApplicable = 0;
             Object.values(this.evaluations).forEach(item => {
-                if (item.status === 'available')      available  += item.score;
-                else if (item.status === 'inadequate') inadequate += item.score;
-                else if (item.status === 'not_available')  notAvailable++;
+                if      (item.status === 'available')    available    += item.score;
+                else if (item.status === 'inadequate')   inadequate   += item.score;
+                else if (item.status === 'not_available') notAvailable++;
                 else if (item.status === 'not_applicable') notApplicable++;
             });
             return { available, inadequate, notAvailable, notApplicable };
         },
+
+        // Exclude not_applicable from both numerator and denominator
         mean() {
-            let totalScore = 0;
+            let totalScore    = 0;
+            let notApplicable = 0;
+
+            // Count how many are marked not_applicable
             Object.values(this.evaluations).forEach(item => {
-                if (item.status === 'available' || item.status === 'inadequate') {
+                if (item.status === 'not_applicable') {
+                    notApplicable++;
+                } else if (item.status === 'available' || item.status === 'inadequate') {
                     totalScore += item.score;
                 }
+                // not_available contributes 0 to score, already handled
             });
-            return this.totalSubparameters > 0
-                ? (totalScore / this.totalSubparameters).toFixed(2)
+
+            const denominator = this.totalRateable - notApplicable;
+
+            return denominator > 0
+                ? (totalScore / denominator).toFixed(2)
                 : '0.00';
-        }
+        },
     },
-    watch: {
-        evaluations: { handler() { this.saveToLocalStorage(); }, deep: true },
-        recommendation()  { this.saveToLocalStorage(); }
-    },
+
     mounted() {
-        this.loadData();
-        window.addEventListener('beforeunload', this.saveScrollPosition);
+        this.loadInitial();
+        this.loaded = true;
+        this.autoSaveInterval = setInterval(() => {
+            if (!this.isLocked) this.saveDraft();
+        }, 30000);
     },
+
     beforeDestroy() {
-        window.removeEventListener('beforeunload', this.saveScrollPosition);
+        clearInterval(this.autoSaveInterval);
     },
+
     methods: {
-        loadData() {
-        const saved = localStorage.getItem(this.storageKey);
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                this.evaluations    = data.evaluations  || {};
-                this.recommendation = data.recommendation || '';
-                // Don't restore isLocked from storage — always derive from props
-                this.isLocked = this.isFinalized ? true : (this.isSubmitted ? true : this.readonly);
-            } catch (e) {
-                console.warn('Failed to restore from localStorage', e);
-                this.loadInitial();
-            }
-        } else {
-            this.loadInitial();
-        }
 
-        this.$nextTick(() => {
-            const savedScroll = localStorage.getItem(this.storageKey + '_scroll');
-            if (savedScroll) window.scrollTo(0, parseInt(savedScroll));
-            this.loaded = true;
-        });
-    },
-
+        // ─── Load & normalize keys from server ───────────────────────────────
+        // Server sends keys already prefixed ("sub_5", "ss_12") if controller
+        // was updated, or plain numeric ("5") for legacy data → we keep both.
         loadInitial() {
             this.evaluations    = { ...this.initialEvaluations };
             this.recommendation = this.initialRecommendation;
-            this.isLocked       = this.readonly;
+            this.isLocked       = this.isFinalized ? true
+                                : this.isSubmitted  ? true
+                                : this.readonly;
         },
+
         unlockForm() {
             if (!this.isSubmitted) return;
             this.isLocked = false;
-            this.saveToLocalStorage();
             this.$nextTick(() => {
                 document.querySelector('.table')?.scrollIntoView({ behavior: 'smooth' });
             });
         },
-        saveToLocalStorage() {
-            localStorage.setItem(this.storageKey, JSON.stringify({
-                evaluations:    this.evaluations,
-                recommendation: this.recommendation,
-                isLocked:       this.isLocked
-            }));
-        },
-        saveScrollPosition() {
-            localStorage.setItem(this.storageKey + '_scroll', window.scrollY);
-        },
-        select(subId, status, score) {
+
+        // ─── Unified select — namespaced by type ('sub' | 'ss') ─────────────
+        select(id, status, score, type = 'sub') {
             if (this.isLocked) return;
+            const key     = type + '_' + String(id);
+            const current = this.evaluations[key];
+
+            // Toggle off: clicking an already-selected radio deselects it
+            if (current && current.status === status &&
+                (status === 'not_available' || status === 'not_applicable')) {
+                Vue.delete(this.evaluations, key);
+                return;
+            }
+
             if (status === 'not_applicable') {
-                Vue.set(this.evaluations, subId, { status, score: null });
+                Vue.set(this.evaluations, key, { status, score: null });
             } else if (status === 'not_available') {
-                Vue.set(this.evaluations, subId, { status, score: 0 });
+                Vue.set(this.evaluations, key, { status, score: 0 });
             } else if (score !== '') {
-                Vue.set(this.evaluations, subId, { status, score: parseInt(score) });
+                Vue.set(this.evaluations, key, { status, score: parseInt(score) });
+            } else {
+                // Dropdown reset to '—' → clear entry
+                Vue.delete(this.evaluations, key);
             }
         },
-        getStatus(id) { return this.evaluations[id]?.status || null; },
-        getScore(id)  { return this.evaluations[id]?.score  || '';   },
+
+        // ─── Namespaced getters ───────────────────────────────────────────────
+        getStatus(id, type = 'sub') {
+            return this.evaluations[type + '_' + id]?.status || null;
+        },
+        getScore(id, type = 'sub') {
+            return this.evaluations[type + '_' + id]?.score ?? '';
+        },
+
         clearAll() {
             if (this.isLocked) return;
             if (!confirm('Clear all evaluations?')) return;
             this.evaluations    = {};
             this.recommendation = '';
-            localStorage.removeItem(this.storageKey);
         },
+
+        // Sub-mean excludes not_applicable from denominator too
+        getSubMean(sub) {
+            if (!sub.has_sub_sub) return '—';
+            let total         = 0;
+            let notApplicable = 0;
+            const total_count = sub.sub_sub_parameters.length;
+
+            sub.sub_sub_parameters.forEach(ss => {
+                const item = this.evaluations['ss_' + ss.id];
+                if (!item) return;
+                if (item.status === 'not_applicable') {
+                    notApplicable++;
+                } else if (item.status === 'available' || item.status === 'inadequate') {
+                    total += item.score;
+                }
+            });
+
+            const denominator = total_count - notApplicable;
+            return denominator > 0 ? (total / denominator).toFixed(2) : '0.00';
+        },
+
+        async saveDraft() {
+            if (this.isLocked || this.draftSaving) return;
+            this.draftSaving = true;
+            try {
+                await fetch(this.draftUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'Accept':       'application/json',
+                    },
+                    body: JSON.stringify({
+                        accred_info_id:  this.accredInfoId,
+                        level_id:        this.levelId,
+                        program_id:      this.programId,
+                        program_area_id: this.programAreaId,
+                        evaluations:     this.evaluations,
+                        recommendation:  this.recommendation,
+                    }),
+                });
+                this.lastSaved = new Date().toLocaleTimeString();
+            } catch (err) {
+                console.warn('Auto-save failed:', err);
+            } finally {
+                this.draftSaving = false;
+            }
+        },
+
         async submitEvaluation() {
             if (this.isLocked || !this.isComplete) return;
             this.saving = true;
@@ -233,7 +306,7 @@ Vue.component('area-evaluation', {
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': this.csrfToken,
-                        'Accept': 'application/json'
+                        'Accept':       'application/json',
                     },
                     body: JSON.stringify({
                         accred_info_id:  this.accredInfoId,
@@ -241,28 +314,45 @@ Vue.component('area-evaluation', {
                         program_id:      this.programId,
                         program_area_id: this.programAreaId,
                         evaluations:     this.evaluations,
-                        recommendation:  this.recommendation
-                    })
+                        recommendation:  this.recommendation,
+                    }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || 'Submission failed');
-                localStorage.removeItem(this.storageKey);
-                localStorage.removeItem(this.storageKey + '_scroll');
                 window.location.href = data.redirect;
             } catch (err) {
                 alert(err.message);
             } finally {
                 this.saving = false;
             }
-        }
+        },
     },
+
     template: `
         <div>
+
+            {{-- Loading --}}
             <div v-if="!loaded" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
+
+            {{-- Draft indicator --}}
+            <div v-if="!isLocked" class="d-flex justify-content-end mb-2">
+                <small class="text-muted fst-italic">
+                    <span v-if="draftSaving">
+                        <i class="bx bx-loader-alt bx-spin me-1"></i>Saving draft...
+                    </span>
+                    <span v-else-if="lastSaved">
+                        <i class="bx bx-check me-1 text-success"></i>Draft saved at @{{ lastSaved }}
+                    </span>
+                    <span v-else-if="isDraft">
+                        <i class="bx bx-info-circle me-1 text-warning"></i>Draft in progress
+                    </span>
+                </small>
+            </div>
+
             {{-- State alerts --}}
             <div v-if="isFinalized" class="alert alert-success d-flex align-items-center gap-2 mb-3">
                 <i class="bx bx-lock fs-5"></i>
@@ -313,55 +403,136 @@ Vue.component('area-evaluation', {
                     </thead>
                     <tbody>
                         <template v-for="parameter in parameters">
+
+                            {{-- Parameter header row --}}
                             <tr class="table-secondary">
                                 <td colspan="6" class="fw-semibold">@{{ parameter.name }}</td>
                             </tr>
-                            <tr v-for="sub in parameter.sub_parameters" :key="sub.id">
-                                <td style="padding-left:24px; font-size:13px;">@{{ sub.name }}</td>
-                                <td class="text-center">
-                                    <select class="form-select form-select-sm"
-                                            :disabled="isLocked"
-                                            :value="getStatus(sub.id) === 'available' ? getScore(sub.id) : ''"
-                                            @change="select(sub.id, 'available', $event.target.value)">
-                                        <option value="">—</option>
-                                        <option value="5">5</option>
-                                        <option value="4">4</option>
-                                        <option value="3">3</option>
-                                    </select>
-                                </td>
-                                <td class="text-center">
-                                    <select class="form-select form-select-sm"
-                                            :disabled="isLocked"
-                                            :value="getStatus(sub.id) === 'inadequate' ? getScore(sub.id) : ''"
-                                            @change="select(sub.id, 'inadequate', $event.target.value)">
-                                        <option value="">—</option>
-                                        <option value="2">2</option>
-                                        <option value="1">1</option>
-                                    </select>
-                                </td>
-                                <td class="text-center">
-                                    <input type="radio"
-                                           :disabled="isLocked"
-                                           :name="'eval_' + sub.id"
-                                           :checked="getStatus(sub.id) === 'not_available'"
-                                           @change="select(sub.id, 'not_available', 0)">
-                                </td>
-                                <td class="text-center">
-                                    <input type="radio"
-                                           :disabled="isLocked"
-                                           :name="'eval_' + sub.id"
-                                           :checked="getStatus(sub.id) === 'not_applicable'"
-                                           @change="select(sub.id, 'not_applicable', null)">
-                                </td>
-                                <td class="text-center">
-                                    <a v-if="sub.uploads_count > 0"
-                                       :href="sub.uploads_url"
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="bx bxs-file-pdf me-1"></i>@{{ sub.uploads_count }}
-                                    </a>
-                                    <span v-else class="text-muted small">—</span>
-                                </td>
-                            </tr>
+
+                            <template v-for="sub in parameter.sub_parameters">
+
+                                {{-- ── Sub-parameter row ── --}}
+                                <tr>
+                                    <td style="padding-left:24px; font-size:13px; font-weight:600;">
+                                        @{{ sub.name }}
+                                    </td>
+
+                                    {{-- Has sub-sub: show mean, no inputs here --}}
+                                    <template v-if="sub.has_sub_sub">
+                                        <td colspan="4" class="text-center text-muted small fst-italic">
+                                            Rated via sub-items below
+                                            — Mean: <strong>@{{ getSubMean(sub) }}</strong>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="text-muted small">—</span>
+                                        </td>
+                                    </template>
+
+                                    {{-- No sub-sub: normal rating inputs, type='sub' --}}
+                                    <template v-else>
+                                        <td class="text-center">
+                                            <select class="form-select form-select-sm"
+                                                    :disabled="isLocked"
+                                                    :value="getStatus(sub.id, 'sub') === 'available' ? getScore(sub.id, 'sub') : ''"
+                                                    @change="select(sub.id, 'available', $event.target.value, 'sub')">
+                                                <option value="">—</option>
+                                                <option value="5">5</option>
+                                                <option value="4">4</option>
+                                                <option value="3">3</option>
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <select class="form-select form-select-sm"
+                                                    :disabled="isLocked"
+                                                    :value="getStatus(sub.id, 'sub') === 'inadequate' ? getScore(sub.id, 'sub') : ''"
+                                                    @change="select(sub.id, 'inadequate', $event.target.value, 'sub')">
+                                                <option value="">—</option>
+                                                <option value="2">2</option>
+                                                <option value="1">1</option>
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="radio"
+                                                   :disabled="isLocked"
+                                                   :name="'eval_sub_' + sub.id"
+                                                   value="not_available"
+                                                   :checked="getStatus(sub.id, 'sub') === 'not_available'"
+                                                   @click="select(sub.id, 'not_available', 0, 'sub')">
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="radio"
+                                                   :disabled="isLocked"
+                                                   :name="'eval_sub_' + sub.id"
+                                                   value="not_applicable"
+                                                   :checked="getStatus(sub.id, 'sub') === 'not_applicable'"
+                                                   @click="select(sub.id, 'not_applicable', null, 'sub')">
+                                        </td>
+                                        <td class="text-center">
+                                            <a v-if="sub.uploads_count > 0"
+                                               :href="sub.uploads_url"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bx bxs-file-pdf me-1"></i>@{{ sub.uploads_count }}
+                                            </a>
+                                            <span v-else class="text-muted small">—</span>
+                                        </td>
+                                    </template>
+                                </tr>
+
+                                {{-- ── Sub-sub-parameter rows, type='ss' ── --}}
+                                <template v-if="sub.has_sub_sub">
+                                    <tr v-for="subSub in sub.sub_sub_parameters" :key="'ss_' + subSub.id">
+                                        <td style="padding-left:48px; font-size:12px; color:#666;">
+                                            <i class="bx bx-subdirectory-right me-1"></i>@{{ subSub.name }}
+                                        </td>
+                                        <td class="text-center">
+                                            <select class="form-select form-select-sm"
+                                                    :disabled="isLocked"
+                                                    :value="getStatus(subSub.id, 'ss') === 'available' ? getScore(subSub.id, 'ss') : ''"
+                                                    @change="select(subSub.id, 'available', $event.target.value, 'ss')">
+                                                <option value="">—</option>
+                                                <option value="5">5</option>
+                                                <option value="4">4</option>
+                                                <option value="3">3</option>
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <select class="form-select form-select-sm"
+                                                    :disabled="isLocked"
+                                                    :value="getStatus(subSub.id, 'ss') === 'inadequate' ? getScore(subSub.id, 'ss') : ''"
+                                                    @change="select(subSub.id, 'inadequate', $event.target.value, 'ss')">
+                                                <option value="">—</option>
+                                                <option value="2">2</option>
+                                                <option value="1">1</option>
+                                            </select>
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="radio"
+                                                   :disabled="isLocked"
+                                                   :name="'eval_ss_' + subSub.id"
+                                                   value="not_available"
+                                                   :checked="getStatus(subSub.id, 'ss') === 'not_available'"
+                                                   @click="select(subSub.id, 'not_available', 0, 'ss')">
+                                        </td>
+                                        <td class="text-center">
+                                            <input type="radio"
+                                                   :disabled="isLocked"
+                                                   :name="'eval_ss_' + subSub.id"
+                                                   value="not_applicable"
+                                                   :checked="getStatus(subSub.id, 'ss') === 'not_applicable'"
+                                                   @click="select(subSub.id, 'not_applicable', null, 'ss')">
+                                        </td>
+                                        <td class="text-center">
+                                            <a v-if="subSub.uploads_count > 0"
+                                               :href="subSub.uploads_url"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bx bxs-file-pdf me-1"></i>@{{ subSub.uploads_count }}
+                                            </a>
+                                            <span v-else class="text-muted small">—</span>
+                                        </td>
+                                    </tr>
+                                </template>
+
+                            </template>
                         </template>
                     </tbody>
                     <tfoot class="fw-semibold table-light">
@@ -369,8 +540,8 @@ Vue.component('area-evaluation', {
                             <td>Total</td>
                             <td class="text-center">@{{ totals.available }}</td>
                             <td class="text-center">@{{ totals.inadequate }}</td>
-                            <td class="text-center">@{{ totals.notAvailable }}</td>
-                            <td class="text-center">@{{ totals.notApplicable }}</td>
+                            <td class="text-center">0</td>
+                            <td class="text-center">N/A</td>
                             <td></td>
                         </tr>
                         <tr>
@@ -402,11 +573,20 @@ Vue.component('area-evaluation', {
 
                 <div class="d-flex gap-2">
                     <button type="button"
+                            class="btn btn-outline-secondary"
+                            :disabled="isLocked || draftSaving"
+                            @click="saveDraft()">
+                        <i class="bx bx-save me-1"></i>
+                        @{{ draftSaving ? 'Saving...' : 'Save Draft' }}
+                    </button>
+
+                    <button type="button"
                             class="btn btn-outline-danger"
                             :disabled="isLocked"
                             @click="clearAll()">
                         <i class="bx bx-trash me-1"></i> Clear All
                     </button>
+
                     <button type="button"
                             class="btn btn-primary"
                             :disabled="isLocked || !isComplete || saving"
@@ -416,10 +596,9 @@ Vue.component('area-evaluation', {
                     </button>
                 </div>
             </div>
+
         </div>
     `
 });
-
-new Vue({ el: '#vue-app' });
-</script
+</script>
 @endpush

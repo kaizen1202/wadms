@@ -95,7 +95,7 @@
                                                 $program['program_id'],
                                             ]) }}"
                                            class="btn btn-sm btn-outline-primary w-100">
-                                            <i class="bx bx-folder-open me-1"></i> View Program
+                                            <i class="bx bx-folder-open me-1"></i> View Areas
                                         </a>
 
                                         @if ($canEvaluate && $progress == 100)

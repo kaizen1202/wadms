@@ -185,7 +185,7 @@
                 </a>
             </li>
 
-            <li class="menu-item {{ Route::is('program.areas.*') ? 'active' : '' }}">
+            <li class="menu-item {{ Route::is('program.areas.evaluations.*') ? 'active' : '' }}">
                 <a href="{{ route('program.areas.evaluations') }}" class="menu-link" style="color:#fff;">
                     <i class="menu-icon tf-icons bx bx-clipboard"></i>
                     <div>Evaluations</div>
@@ -252,7 +252,13 @@
             {{-- Name and role --}}
             <div class="flex-grow-1 text-truncate">
                 <div class="fw-semibold text-truncate">{{ $user->name }}</div>
-                <small class="opacity-75">{{ $currentRole }}</small>
+                <small class="opacity-75">
+                    {{ 
+                        $user->status !== \App\Enums\UserStatus::PENDING->value 
+                        ? $currentRole
+                        : $user->status
+                    }}
+                </small>
             </div>
 
             {{-- Dropdown for profile, role switch, logout --}}

@@ -4,7 +4,7 @@ namespace App\Enums;
 
 enum EvaluationStatus: string
 {
-    case PENDING = 'pending';
+    case DRAFT = 'draft';
     case SUBMITTED = 'submitted';
     case UPDATED = 'updated';
     case FINALIZED = 'finalized';

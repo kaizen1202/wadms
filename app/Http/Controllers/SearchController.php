@@ -202,8 +202,8 @@ class SearchController extends Controller
     {
         return AccreditationInfo::with([
                 'accreditationBody',
-                'levels',
-                'levels.programs',
+                'infoLevelProgramMappings.level',
+                'infoLevelProgramMappings.program',
             ])
             ->when($scopedAreaIds !== null, fn($q) =>
                 $q->whereHas('infoLevelProgramMappings', fn($q) =>
@@ -242,16 +242,18 @@ class SearchController extends Controller
                         'id'   => $a->accreditationBody?->id,
                         'name' => $a->accreditationBody?->name,
                     ],
-                    'levels'         => $a->levels->map(fn($l) => [
-                        'id'       => $l->id,
-                        'name'     => $l->level_name,
-                        'programs' => $l->programs->map(fn($p) => [
-                            'id'   => $p->id,
-                            'name' => $p->program_name,
-                        ])->toArray(),
-                    ])->toArray(),
-                    'levels_count'   => $a->levels->count(),
-                    'programs_count' => $a->levels->flatMap->programs->count(),
+                    'levels'         => $a->infoLevelProgramMappings
+                                            ->groupBy('level_id')
+                                            ->map(fn($group) => [
+                                                'id'       => $group->first()->level?->id,
+                                                'name'     => $group->first()->level?->level_name,
+                                                'programs' => $group->map(fn($m) => [
+                                                    'id'   => $m->program?->id,
+                                                    'name' => $m->program?->program_name,
+                                                ])->values()->toArray(),
+                                            ])->values()->toArray(),
+                    'levels_count'   => $a->infoLevelProgramMappings->groupBy('level_id')->count(),
+                    'programs_count' => $a->infoLevelProgramMappings->count(),
                 ],
             ));
     }
@@ -582,13 +584,7 @@ class SearchController extends Controller
                             . ' · ' . ($d->program?->program_name ?? 'No Program'),
                 badge:      $d->file_type ?? 'File',
                 badgeColor: $this->documentTypeColor($d->file_type),
-                url:        route('subparam.uploads.index', [
-                                'infoId'        => $d->accred_info_id,
-                                'levelId'       => $d->level_id,
-                                'programId'     => $d->program_id,
-                                'programAreaId' => $d->area_id,
-                                'subParameter'  => $d->subparameter_id,
-                            ]),
+                url:        \Illuminate\Support\Facades\Storage::url($d->file_path),
                 icon:       $this->documentIcon($d->file_type),
                 meta: [
                     'file_name'     => $d->file_name,

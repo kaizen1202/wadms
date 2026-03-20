@@ -43,6 +43,42 @@
     <!-- Page CSS -->
     <link rel="stylesheet" href="{{ asset('assets/vendor/css/pages/page-auth.css') }}" />
 
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            position: relative;
+            background-image: url('{{ asset('assets/img/wdms/pit-img.jpg') }}');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        /* Dark overlay — matches hero's bg-black/60 */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.60);
+            z-index: 0;
+        }
+
+        .container-xxl {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Make the card slightly translucent so bg peeks through */
+        .card {
+            background: rgba(255, 255, 255, 0.97) !important;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4) !important;
+        }
+    </style>
+
     <!-- Helpers -->
     <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
     <script src="{{ asset('assets/js/config.js') }}"></script>
@@ -63,7 +99,6 @@
                                          alt="Logo"
                                          class="w-px-40 h-auto" />
                                 </span>
-                                
                                 <span class="app-brand-text demo text-body fw-bold ms-2 text-uppercase">PIT</span>
                             </a>
                         </div>
@@ -97,7 +132,7 @@
                             </div>
 
                             <!-- Password -->
-                            <div class="mb-3 form-password-toggle">
+                            <div class="mb-3" id="password-toggle-app">
                                 <div class="d-flex justify-content-between">
                                     <label for="password" class="form-label">Password</label>
                                     @if (Route::has('password.request'))
@@ -108,13 +143,15 @@
                                 </div>
                                 <div class="input-group input-group-merge">
                                     <input id="password"
-                                           type="password"
+                                           :type="showPassword ? 'text' : 'password'"
                                            name="password"
                                            required
                                            autocomplete="current-password"
                                            class="form-control @error('password') is-invalid @enderror"
                                            placeholder="Password" />
-                                    <span class="input-group-text cursor-pointer"><i class="bx bx-hide"></i></span>
+                                    <span class="input-group-text cursor-pointer" @click="showPassword = !showPassword">
+                                        <i :class="showPassword ? 'bx bx-show' : 'bx bx-hide'"></i>
+                                    </span>
                                 </div>
                                 @error('password')
                                     <span class="invalid-feedback">{{ $message }}</span>
@@ -159,25 +196,16 @@
     <!-- Main JS -->
     <script src="{{ asset('assets/js/main.js') }}"></script>
 
-    <!-- Optional: Password toggle -->
-    <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        document.querySelectorAll('.form-password-toggle .input-group-text').forEach(toggle => {
-            toggle.addEventListener('click', function () {
-                const input = this.closest('.input-group').querySelector('input');
-                const icon = this.querySelector('i');
+    <!-- Vue.js CDN -->
+    <script src="{{ asset('assets/js/vue.js') }}"></script>
 
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.classList.remove('bx-hide');
-                    icon.classList.add('bx-show');
-                } else {
-                    input.type = 'password';
-                    icon.classList.remove('bx-show');
-                    icon.classList.add('bx-hide');
-                }
-            });
-        });
+    <!-- Password toggle via Vue -->
+    <script>
+    new Vue({
+        el: '#password-toggle-app',
+        data: {
+            showPassword: false
+        }
     });
     </script>
 </body>

@@ -17,9 +17,12 @@ use App\Models\ADMIN\Area;
 use App\Models\ADMIN\AreaParameterMapping;
 use App\Models\ADMIN\InfoLevelProgramMapping;
 use App\Models\ADMIN\Parameter;
+use App\Models\ADMIN\ParameterSubparameterMapping;
 use App\Models\ADMIN\Program;
 use App\Models\ADMIN\ProgramAreaMapping;
 use App\Models\ADMIN\SubParameter;
+use App\Models\ADMIN\SubparamSubSubparamMapping;
+use App\Models\ADMIN\SubSubparameter;
 use App\Models\AreaEvaluation;
 use App\Models\Role;
 use App\Models\User;
@@ -102,6 +105,7 @@ class AdminAcreditationController extends Controller
     {
         $user = auth()->user();
         $isAdmin = $user->user_type === UserType::ADMIN;
+        $isDean = $user->user_type === UserType::DEAN;
         $accreditation = AccreditationInfo::with('accreditationBody')->findOrFail($id);
 
         $levels = InfoLevelProgramMapping::with(['level', 'program'])
@@ -112,7 +116,8 @@ class AdminAcreditationController extends Controller
         return view('admin.accreditors.show-accreditation', [
             'accreditation' => $accreditation,
             'levels' => $levels,
-            'isAdmin' => $isAdmin
+            'isAdmin' => $isAdmin,
+            'isDean' => $isDean,
         ]);
     }
 
@@ -340,117 +345,118 @@ class AdminAcreditationController extends Controller
 
 
     public function showProgram($infoId, $levelId, $programName)
-    {
-        $user = auth()->user();
+{
+    $user = auth()->user();
 
-        $isAdmin = $user->currentRole->name === UserType::ADMIN->value;
-        $isDean  = $user->currentRole->name === UserType::DEAN->value;
+    $isAdmin = $user->currentRole->name === UserType::ADMIN->value;
+    $isDean  = $user->currentRole->name === UserType::DEAN->value;
 
-        $levelName = AccreditationLevel::where('id', $levelId)->value('level_name');
+    $levelName = AccreditationLevel::where('id', $levelId)->value('level_name');
 
-        $program = InfoLevelProgramMapping::where([
-            'accreditation_info_id' => $infoId,
-            'level_id' => $levelId,
-        ])->whereHas('program', function ($q) use ($programName) {
-            $q->where('program_name', $programName);
-        })->firstOrFail();
+    $program = InfoLevelProgramMapping::where([
+        'accreditation_info_id' => $infoId,
+        'level_id' => $levelId,
+    ])->whereHas('program', function ($q) use ($programName) {
+        $q->where('program_name', $programName);
+    })->firstOrFail();
 
-        // ================= ROLE IDs =================
-        $roles = Role::whereIn('name', [
-            UserType::INTERNAL_ASSESSOR->value,
-            UserType::TASK_FORCE->value,
-        ])->pluck('id', 'name');
 
-        $iaRoleId = $roles[UserType::INTERNAL_ASSESSOR->value] ?? null;
-        $tfRoleId = $roles[UserType::TASK_FORCE->value] ?? null;
+    $accreditationStatus = AccreditationInfo::where('id', $infoId)->value('status');
 
-        // ================= USERS TO SHOW =================
-        if ($isAdmin) {
-            $users = User::whereHas('roles', function ($q) {
-                $q->where('name', UserType::INTERNAL_ASSESSOR);
-            })->where('status', UserStatus::ACTIVE)->orderBy('name')->get();
+    // ================= ROLE IDs =================
+    $roles = Role::whereIn('name', [
+        UserType::INTERNAL_ASSESSOR->value,
+        UserType::TASK_FORCE->value,
+    ])->pluck('id', 'name');
 
-        } elseif ($isDean) {
-            $users = User::whereHas('roles', function ($q) {
-                $q->where('name', UserType::TASK_FORCE);
-            })->where('status', UserStatus::ACTIVE)->orderBy('name')->get();
+    $iaRoleId = $roles[UserType::INTERNAL_ASSESSOR->value] ?? null;
+    $tfRoleId = $roles[UserType::TASK_FORCE->value] ?? null;
 
-        } else {
-            $users = collect();
-        }
+    // ================= USERS TO SHOW =================
+    if ($isAdmin) {
+        $users = User::whereHas('roles', function ($q) {
+            $q->where('name', UserType::INTERNAL_ASSESSOR);
+        })->where('status', UserStatus::ACTIVE)->orderBy('name')->get();
 
-        // ================= PROGRAM AREAS =================
-        if ($isAdmin || $isDean) {
+    } elseif ($isDean) {
+        $users = User::whereHas('roles', function ($q) {
+            $q->where('name', UserType::TASK_FORCE);
+        })->where('status', UserStatus::ACTIVE)->orderBy('name')->get();
 
-            $programAreas = ProgramAreaMapping::with([
-                'users' => function ($q) use ($isAdmin, $isDean, $iaRoleId, $tfRoleId) {
-
-                    if ($isAdmin) {
-                        // Assigned by Admin: role_id = IA, role IS NULL
-                        $q->wherePivot('role_id', $iaRoleId)
-                        ->wherePivot('role', null);
-
-                    } elseif ($isDean) {
-                        // Assigned by Dean: role_id = TF, role IS NOT NULL (chair/member)
-                        $q->wherePivot('role_id', $tfRoleId)
-                        ->wherePivotNotNull('role');
-                    }
-
-                    $q->orderBy('name');
-                }
-            ])->where('info_level_program_mapping_id', $program->id)->get();
-
-        } else {
-
-            // ================= NON-ADMIN/DEAN =================
-            $isInternalAssessor = $user->currentRole->name === UserType::INTERNAL_ASSESSOR->value;
-            $isTaskForce        = $user->currentRole->name === UserType::TASK_FORCE->value;
-
-            $assignedAreaIds = AccreditationAssignment::where([
-                'user_id'        => $user->id,
-                'accred_info_id' => $infoId,
-                'level_id'       => $levelId,
-                'program_id'     => $program->program_id,
-            ])
-            // Also filter by correct role_id + role null/not-null
-            ->when($isInternalAssessor, fn($q) => $q->where('role_id', $iaRoleId)->whereNull('role'))
-            ->when($isTaskForce,        fn($q) => $q->where('role_id', $tfRoleId)->whereNotNull('role'))
-            ->pluck('area_id')
-            ->unique()
-            ->values();
-
-            $programAreas = ProgramAreaMapping::with([
-                'users' => function ($q) use ($isInternalAssessor, $isTaskForce, $iaRoleId, $tfRoleId) {
-
-                    if ($isInternalAssessor) {
-                        $q->wherePivot('role_id', $iaRoleId)
-                        ->wherePivot('role', null);
-
-                    } elseif ($isTaskForce) {
-                        $q->wherePivot('role_id', $tfRoleId)
-                        ->wherePivotNotNull('role');
-                    }
-
-                    $q->orderBy('name');
-                }
-            ])
-            ->where('info_level_program_mapping_id', $program->id)
-            ->whereIn('id', $assignedAreaIds)
-            ->get();
-        }
-
-        return view('admin.accreditors.program', [
-            'infoId'      => $infoId,
-            'level'       => $levelName,
-            'levelId'     => $levelId,
-            'programName' => $programName,
-            'programId'   => $program->program_id,
-            'users'       => $users,
-            'programAreas'=> $programAreas,
-            'isAdmin'     => $isAdmin,
-            'isDean'      => $isDean,
-        ]);
+    } else {
+        $users = collect();
     }
+
+    // ================= PROGRAM AREAS =================
+    if ($isAdmin || $isDean) {
+
+        $programAreas = ProgramAreaMapping::with([
+            'users' => function ($q) use ($isAdmin, $isDean, $iaRoleId, $tfRoleId) {
+
+                if ($isAdmin) {
+                    $q->wherePivot('role_id', $iaRoleId)
+                      ->wherePivot('role', null);
+
+                } elseif ($isDean) {
+                    $q->wherePivot('role_id', $tfRoleId)
+                      ->wherePivotNotNull('role');
+                }
+
+                $q->orderBy('name');
+            }
+        ])->where('info_level_program_mapping_id', $program->id)->get();
+
+    } else {
+
+        // ================= NON-ADMIN/DEAN =================
+        $isInternalAssessor = $user->currentRole->name === UserType::INTERNAL_ASSESSOR->value;
+        $isTaskForce        = $user->currentRole->name === UserType::TASK_FORCE->value;
+
+        $assignedAreaIds = AccreditationAssignment::where([
+            'user_id'        => $user->id,
+            'accred_info_id' => $infoId,
+            'level_id'       => $levelId,
+            'program_id'     => $program->program_id,
+        ])
+        ->when($isInternalAssessor, fn($q) => $q->where('role_id', $iaRoleId)->whereNull('role'))
+        ->when($isTaskForce,        fn($q) => $q->where('role_id', $tfRoleId)->whereNotNull('role'))
+        ->pluck('area_id')
+        ->unique()
+        ->values();
+
+        $programAreas = ProgramAreaMapping::with([
+            'users' => function ($q) use ($isInternalAssessor, $isTaskForce, $iaRoleId, $tfRoleId) {
+
+                if ($isInternalAssessor) {
+                    $q->wherePivot('role_id', $iaRoleId)
+                      ->wherePivot('role', null);
+
+                } elseif ($isTaskForce) {
+                    $q->wherePivot('role_id', $tfRoleId)
+                      ->wherePivotNotNull('role');
+                }
+
+                $q->orderBy('name');
+            }
+        ])
+        ->where('info_level_program_mapping_id', $program->id)
+        ->whereIn('id', $assignedAreaIds)
+        ->get();
+    }
+
+    return view('admin.accreditors.program', [
+        'infoId'              => $infoId,
+        'level'               => $levelName,
+        'levelId'             => $levelId,
+        'programName'         => $programName,
+        'programId'           => $program->program_id,
+        'users'               => $users,
+        'programAreas'        => $programAreas,
+        'isAdmin'             => $isAdmin,
+        'isDean'              => $isDean,
+        'accreditationStatus' => $accreditationStatus, 
+    ]);
+}
 
     public function getProgramAreas($programId)
     {
@@ -829,6 +835,9 @@ class AdminAcreditationController extends Controller
         $isInternalAssessor = $roleName === UserType::INTERNAL_ASSESSOR->value;
         $isAccreditor       = $roleName === UserType::ACCREDITOR->value;
 
+        // ================= ACCREDITATION STATUS =================
+        $accreditationStatus = AccreditationInfo::where('id', $infoId)->value('status');
+
         // ================= CONTEXT =================
         $context = InfoLevelProgramMapping::where([
             'accreditation_info_id' => $infoId,
@@ -839,7 +848,7 @@ class AdminAcreditationController extends Controller
         // ================= PROGRAM AREA =================
         $programArea = ProgramAreaMapping::with([
             'area',
-            'parameters.sub_parameters'
+            'parameters.sub_parameters.subSubParameters.subparamSubSubparamMapping'
         ])
         ->where('id', $programAreaId)
         ->where('info_level_program_mapping_id', $context->id)
@@ -875,8 +884,22 @@ class AdminAcreditationController extends Controller
             ->get()
             ->sortByDesc(fn ($a) => strtolower($a->role?->value ?? '') === 'chair');
 
+        $availableIAs = User::whereHas('roles', function ($q) {
+                $q->where('name', UserType::INTERNAL_ASSESSOR->value);
+            })
+            ->where('status', UserStatus::ACTIVE)
+            ->orderBy('name')
+            ->get();
+
+        $availableTFs = User::whereHas('roles', function ($q) {
+                $q->where('name', UserType::TASK_FORCE->value);
+            })
+            ->where('status', UserStatus::ACTIVE)
+            ->orderBy('name')
+            ->get();
+
         // ================= ROLE-BASED ASSIGNMENTS FOR VIEW =================
-        if ($isAdmin) {
+        if ($isAdmin || $isAccreditor) {
             $assignments = $internalAssessors;
         } elseif ($isDean || $isTaskForce) {
             $assignments = $taskForces;
@@ -885,6 +908,7 @@ class AdminAcreditationController extends Controller
         }
 
         return view('admin.accreditors.parameter', [
+            'accreditationStatus' => $accreditationStatus,
             'infoId'             => $infoId,
             'levelId'            => $levelId,
             'programId'          => $programId,
@@ -892,8 +916,6 @@ class AdminAcreditationController extends Controller
             'context'            => $context,
             'programArea'        => $programArea,
             'assignments'        => $assignments,
-            // Pass both sets separately so the blade can show
-            // avatars for both groups regardless of viewer role
             'internalAssessors'  => $internalAssessors,
             'taskForces'         => $taskForces,
             'parameters'         => $programArea->parameters,
@@ -903,17 +925,19 @@ class AdminAcreditationController extends Controller
             'isIA'               => $isInternalAssessor,
             'isAccreditor'       => $isAccreditor,
             'loggedInUser'       => $user,
+            'availableIAs' => $availableIAs,
+            'availableTFs' => $availableTFs,
         ]);
     }
 
     public function storeParameters(Request $request, $programAreaMappingId)
     {
-        // Validate the incoming request
         $request->validate([
-            'area_id' => 'required|exists:areas,id',
-            'parameters' => 'required|array|min:1',
-            'parameters.*.name' => 'required|string|max:255',
-            'parameters.*.sub_parameters.*' => 'nullable|string|max:255',
+            'area_id'                                          => 'required|exists:areas,id',
+            'parameters'                                       => 'required|array|min:1',
+            'parameters.*.name'                                => 'required|string|max:255',
+            'parameters.*.sub_parameters.*.name'               => 'nullable|string|max:255',
+            'parameters.*.sub_parameters.*.sub_of_sub.*'       => 'nullable|string|max:255',
         ]);
 
         $parametersData = $request->input('parameters');
@@ -922,41 +946,179 @@ class AdminAcreditationController extends Controller
 
             foreach ($parametersData as $paramData) {
 
-                // Create the Parameter
                 $parameter = Parameter::create([
                     'parameter_name' => $paramData['name'],
-                    'area_id' => $request->input('area_id'),
+                    'area_id'        => $request->input('area_id'),
                 ]);
 
-                // Map the Parameter to the Program Area
                 $areaParamMapping = AreaParameterMapping::create([
                     'program_area_mapping_id' => $programAreaMappingId,
-                    'parameter_id' => $parameter->id,
+                    'parameter_id'            => $parameter->id,
                 ]);
 
-                // If Sub-Parameters exist, create them and attach to mapping
                 if (!empty($paramData['sub_parameters'])) {
-                    foreach ($paramData['sub_parameters'] as $subName) {
+                    foreach ($paramData['sub_parameters'] as $subData) {
 
-                        // Skip empty sub-parameter names
-                        if (trim($subName) === '')
-                            continue;
+                        // Support both old format (plain string) and new format (array with 'name')
+                        $subName = is_array($subData) ? ($subData['name'] ?? '') : $subData;
+
+                        if (trim($subName) === '') continue;
 
                         $subParam = SubParameter::create([
                             'sub_parameter_name' => $subName,
-                            'parameter_id' => $parameter->id,
+                            'parameter_id'       => $parameter->id,
                         ]);
 
-                        // Attach sub-parameter to area mapping
                         $areaParamMapping->subParameters()->attach($subParam->id);
+
+                        // Always create param-subparam mapping
+                        $paramSubParamMapping = ParameterSubparameterMapping::firstOrCreate([
+                            'area_parameter_mapping_id' => $areaParamMapping->id,
+                            'subparameter_id'          => $subParam->id,
+                        ]);
+
+                        // Create Sub-of-Sub-Parameters if present
+                        if (is_array($subData) && !empty($subData['sub_of_sub'])) {
+                            foreach ($subData['sub_of_sub'] as $subOfSubName) {
+
+                                if (trim($subOfSubName) === '') continue;
+
+                                $subSubParam = SubSubparameter::create([
+                                    'name'             => $subOfSubName,
+                                    'sub_parameter_id' => $subParam->id,
+                                ]);
+
+                                SubparamSubSubparamMapping::create([
+                                    'parameter_subparameter_mapping_id' => $paramSubParamMapping->id,
+                                    'sub_subparameter_id'              => $subSubParam->id,
+                                ]);
+                            }
+                        }
                     }
                 }
             }
         });
 
         return response()->json([
-            'message' => 'Parameters & Sub-Parameters added successfully'
+            'message' => 'Parameters, Sub-Parameters & Sub-of-Sub-Parameters added successfully'
         ]);
+    }
+
+    // =====================================================
+    // ADD SUB-PARAMETER DIRECTLY TO EXISTING PARAMETER
+    // =====================================================
+    public function storeSubParameter(Request $request, Parameter $parameter)
+    {
+        $request->validate([
+            'sub_parameter_names'   => 'required|array|min:1',
+            'sub_parameter_names.*' => 'required|string|max:255',
+        ]);
+
+        // Find the area parameter mapping for this parameter
+        $areaParamMapping = AreaParameterMapping::where('parameter_id', $parameter->id)
+            ->firstOrFail();
+
+        DB::transaction(function () use ($request, $parameter, $areaParamMapping) {
+            foreach ($request->input('sub_parameter_names') as $index => $subName) {
+                if (trim($subName) === '') continue;
+
+                $subParam = SubParameter::create([
+                    'sub_parameter_name' => $subName,
+                    'parameter_id'       => $parameter->id,
+                ]);
+
+                $areaParamMapping->subParameters()->attach($subParam->id);
+
+                $paramSubParamMapping = ParameterSubparameterMapping::firstOrCreate([
+                    'area_parameter_mapping_id' => $areaParamMapping->id,
+                    'subparameter_id'           => $subParam->id,
+                ]);
+
+                // Handle sub-of-sub if submitted alongside
+                // JS sends sub_of_sub_names[1][], sub_of_sub_names[2][], etc. (1-based index)
+                $subOfSubNames = $request->input('sub_of_sub_names.' . ($index + 1), []);
+
+                foreach ($subOfSubNames as $subOfSubName) {
+                    if (trim($subOfSubName) === '') continue;
+
+                    $subSubParam = SubSubparameter::create([
+                        'name'             => $subOfSubName,
+                        'sub_parameter_id' => $subParam->id,
+                    ]);
+
+                    SubparamSubSubparamMapping::create([
+                        'parameter_subparameter_mapping_id' => $paramSubParamMapping->id,
+                        'sub_subparameter_id'               => $subSubParam->id,
+                    ]);
+                }
+            }
+        });
+
+        return response()->json(['message' => 'Sub-Parameters added successfully']);
+    }
+
+    // =====================================================
+    // ADD SUB-OF-SUB TO EXISTING SUB-PARAMETER
+    // =====================================================
+    public function storeSubOfSub(Request $request, SubParameter $subParameter)
+    {
+        $request->validate([
+            'sub_of_sub_names'   => 'required|array|min:1',
+            'sub_of_sub_names.*' => 'required|string|max:255',
+        ]);
+
+        $paramSubParamMapping = ParameterSubparameterMapping::where('subparameter_id', $subParameter->id)
+            ->firstOrFail();
+
+        DB::transaction(function () use ($request, $subParameter, $paramSubParamMapping) {
+            foreach ($request->input('sub_of_sub_names') as $name) {
+                if (trim($name) === '') continue;
+
+                $subSubParam = SubSubparameter::create([
+                    'name'             => $name,
+                    'sub_parameter_id' => $subParameter->id,
+                ]);
+
+                SubparamSubSubparamMapping::create([
+                    'parameter_subparameter_mapping_id' => $paramSubParamMapping->id,
+                    'sub_subparameter_id'               => $subSubParam->id,
+                ]);
+            }
+        });
+
+        return response()->json(['message' => 'Sub-of-Sub-Parameters added successfully']);
+    }
+
+    // =====================================================
+    // UPDATE SUB-OF-SUB-PARAMETER
+    // =====================================================
+    public function updateSubOfSub(Request $request, SubSubparameter $subSubParameter)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $subSubParameter->update([
+            'name' => $request->input('name'),
+        ]);
+
+        return response()->json(['message' => 'Sub-of-Sub-Parameter updated successfully']);
+    }
+
+    // =====================================================
+    // DELETE SUB-OF-SUB-PARAMETER
+    // =====================================================
+    public function destroySubOfSub(SubSubparameter $subSubParameter)
+    {
+        DB::transaction(function () use ($subSubParameter) {
+            // Delete the mapping first to avoid FK constraint errors
+            SubparamSubSubparamMapping::where('sub_subparameter_id', $subSubParameter->id)->delete();
+
+            // Delete the sub-sub-parameter itself
+            $subSubParameter->delete();
+        });
+
+        return response()->json(['message' => 'Sub-of-Sub-Parameter deleted successfully']);
     }
 
     public function subParameterUploads(
@@ -966,14 +1128,14 @@ class AdminAcreditationController extends Controller
         int $programId,
         int $programAreaId
     ) {
+        $accreditationStatus = AccreditationInfo::where('id', $infoId)->value('status');
         $subParameter->load(['parameter', 'uploads.uploader']);
 
         return view('admin.accreditors.sub-param', [
             'subParameter' => $subParameter,
             'parameter' => $subParameter->parameter,
             'uploads' => $subParameter->uploads,
-
-            // pass context forward
+            'accreditationStatus' => $accreditationStatus->value,
             'infoId' => $infoId,
             'levelId' => $levelId,
             'programId' => $programId,
@@ -992,15 +1154,22 @@ class AdminAcreditationController extends Controller
     ) {
         $request->validate([
             'files' => 'required|array',
-            'files.*' => 'file|max:10240',
+            'files.*' => 'file|mimes:pdf|max:10240',
         ]);
 
         $user = auth()->user();
 
         foreach ($request->file('files') as $file) {
 
-            $path = $file->store(
+            $originalName = $file->getClientOriginalName();
+            $nameWithoutExt = pathinfo($originalName, PATHINFO_FILENAME);
+            $extension = $file->getClientOriginalExtension();
+
+            $fileName = $nameWithoutExt . '_' . time() . '.' . $extension;
+
+            $path = $file->storeAs(
                 "accreditation_uploads/{$programAreaId}/{$subParameter->id}",
+                $fileName,
                 'public'
             );
 
@@ -1161,7 +1330,7 @@ class AdminAcreditationController extends Controller
                     $q->wherePivot('role_id', $iaRoleId)
                     ->wherePivot('role', null);
 
-                } elseif ($isDean || $isTaskForce || $isAccreditor) {
+                } elseif ($isDean || $isTaskForce) {
                     // Accreditor sees same view as Dean — Task Force assignments
                     $q->wherePivot('role_id', $tfRoleId)
                     ->wherePivotNotNull('role');
@@ -1173,8 +1342,7 @@ class AdminAcreditationController extends Controller
             'evaluations' => function ($q) {
                 $q->latest()->limit(1);
             },
-
-            'evaluations.files.uploader',
+            'evaluations.evaluator',
             'users.roles',
         ])
         ->where('info_level_program_mapping_id', $context->id);
@@ -1259,7 +1427,6 @@ class AdminAcreditationController extends Controller
             'area',
 
             'users' => function ($q) use ($user, $iaRoleId) {
-                // Only Internal Assessors assigned to this area
                 $q->wherePivot('role_id', $iaRoleId)
                 ->wherePivot('role', null)
                 ->orderByRaw('users.id = ? DESC', [$user->id])
@@ -1267,6 +1434,8 @@ class AdminAcreditationController extends Controller
             },
 
             'parameters.sub_parameters',
+            'parameters.sub_parameters.subSubParameters.uploads',
+            'parameters.sub_parameters.uploads',
         ])
         ->where('id', $programAreaId)
         ->where('info_level_program_mapping_id', $context->id)
@@ -1280,17 +1449,33 @@ class AdminAcreditationController extends Controller
                 'id'   => $param->id,
                 'name' => $param->parameter_name,
                 'sub_parameters' => $param->sub_parameters->map(function ($sub) use ($infoId, $levelId, $programId, $programAreaId) {
+                    $subSubParams = $sub->subSubParameters;
                     return [
-                        'id'           => $sub->id,
-                        'name'         => $sub->sub_parameter_name,
-                        'uploads_count' => $sub->uploads->count(),
-                        'uploads_url'  => route('subparam.uploads.index', [
+                        'id'               => $sub->id,
+                        'name'             => $sub->sub_parameter_name,
+                        'has_sub_sub'      => $subSubParams->isNotEmpty(),
+                        'uploads_count'    => $sub->uploads->count(),
+                        'uploads_url'      => route('subparam.uploads.index', [
                             'subParameter'  => $sub->id,
                             'infoId'        => $infoId,
                             'levelId'       => $levelId,
                             'programId'     => $programId,
                             'programAreaId' => $programAreaId,
                         ]),
+                        'sub_sub_parameters' => $subSubParams->map(function ($subSub) use ($infoId, $levelId, $programId, $programAreaId) {
+                            return [
+                                'id'            => $subSub->id,
+                                'name'          => $subSub->name,
+                                'uploads_count' => $subSub->uploads->count(),
+                                'uploads_url'   => route('subsubparam.uploads.index', [
+                                    'subSubParameterId' => $subSub->id,
+                                    'infoId'            => $infoId,
+                                    'levelId'           => $levelId,
+                                    'programId'         => $programId,
+                                    'programAreaId'     => $programAreaId,
+                                ]),
+                            ];
+                        })->toArray(),
                     ];
                 })->toArray(),
             ];
@@ -1308,14 +1493,18 @@ class AdminAcreditationController extends Controller
             'program_id'     => $programId,
             'area_id'        => $programAreaId,
             'evaluated_by'   => $user->id,
-        ])->with('subparameterRatings.ratingOption', 'areaRecommendations')->first();
+        ])->with([
+            'subparameterRatings.ratingOption',
+            'subSubParameterRatings.ratingOption',
+            'areaRecommendations'
+        ])->first();
 
         $isFinalized = $currentUserEvaluation && $currentUserEvaluation->status === EvaluationStatus::FINALIZED;
         $isSubmitted = $currentUserEvaluation && in_array($currentUserEvaluation->status, [
             EvaluationStatus::SUBMITTED,
             EvaluationStatus::UPDATED,
         ]);
-
+        $isDraft  = $currentUserEvaluation && $currentUserEvaluation->status === EvaluationStatus::DRAFT;
         $readonly = $isFinalized || $isSubmitted;
         $locked   = $isFinalized;
 
@@ -1323,17 +1512,21 @@ class AdminAcreditationController extends Controller
         $initialRecommendation = '';
 
         if ($currentUserEvaluation) {
+
             foreach ($currentUserEvaluation->subparameterRatings as $rating) {
-                $label  = $rating->ratingOption->label;
-                $status = match ($label) {
-                    'Available'                => 'available',
-                    'Available but Inadequate' => 'inadequate',
-                    'Not Available'            => 'not_available',
-                    'Not Applicable'           => 'not_applicable',
-                    default                    => null,
-                };
+                $status = $this->mapLabelToStatus($rating->ratingOption->label);
                 if ($status) {
-                    $initialEvaluations[$rating->subparameter_id] = [
+                    $initialEvaluations['sub_' . $rating->subparameter_id] = [
+                        'status' => $status,
+                        'score'  => $rating->score,
+                    ];
+                }
+            }
+
+            foreach ($currentUserEvaluation->subSubParameterRatings as $rating) {
+                $status = $this->mapLabelToStatus($rating->ratingOption->label);
+                if ($status) {
+                    $initialEvaluations['ss_' . $rating->sub_subparameter_id] = [
                         'status' => $status,
                         'score'  => $rating->score,
                     ];
@@ -1373,8 +1566,21 @@ class AdminAcreditationController extends Controller
             'isAdmin',
             'isInternalAssessor',
             'readonly',
+            'isDraft',
             'isSubmitted',
             'isFinalized'
         ));
+    }
+    
+
+    private function mapLabelToStatus(string $label): ?string
+    {
+        return match ($label) {
+            'Available'                => 'available',
+            'Available but Inadequate' => 'inadequate',
+            'Not Available'            => 'not_available',
+            'Not Applicable'           => 'not_applicable',
+            default                    => null,
+        };
     }
 }

@@ -17,5 +17,4 @@ class AreaEvaluation extends Model
     {
         return $this->hasMany(AreaEvaluationFile::class);
     }
-
 }

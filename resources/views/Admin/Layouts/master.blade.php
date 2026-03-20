@@ -29,8 +29,6 @@
     <link rel="stylesheet" href="{{ asset('assets/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendor/libs/perfect-scrollbar/perfect-scrollbar.css') }}" />
     <link rel="stylesheet" href="{{ asset('assets/vendor/libs/apex-charts/apex-charts.css') }}" />
-    @vite('resources/css/accreditation.css')
-    @vite('resources/css/global-search.css')
 
     <script src="{{ asset('assets/vendor/js/helpers.js') }}"></script>
     <script src="{{ asset('assets/js/config.js') }}"></script>
@@ -68,23 +66,25 @@
                         </div>
                     </div>
 
-                    <div class="navbar-nav align-items-center ms-auto">
-                        <div class="nav-item d-flex align-items-center">
-                            <button type="button"
-                                class="btn btn-primary d-flex align-items-center gap-2 px-3"
-                                style="border-radius:8px; min-width:220px; justify-content:space-between;"
-                                @click="$refs.globalSearch.open()">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bx bx-search"></i>
-                                    <span style="font-size:0.875rem;">Search...</span>
-                                </div>
-                                <kbd style="font-size:0.65rem; padding:2px 7px; border-radius:4px;
-                                            background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff;">
-                                    Ctrl K
-                                </kbd>
-                            </button>
+                    @if ($user->status === \App\Enums\UserStatus::ACTIVE->value)
+                        <div class="navbar-nav align-items-center ms-auto">
+                            <div class="nav-item d-flex align-items-center">
+                                <button type="button"
+                                    class="btn btn-primary d-flex align-items-center gap-2 px-3"
+                                    style="border-radius:8px; min-width:220px; justify-content:space-between;"
+                                    @click="$refs.globalSearch.open()">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bx bx-search"></i>
+                                        <span style="font-size:0.875rem;">Search...</span>
+                                    </div>
+                                    <kbd style="font-size:0.65rem; padding:2px 7px; border-radius:4px;
+                                                background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3); color:#fff;">
+                                        Ctrl K
+                                    </kbd>
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                 </div>
             </nav>
 
@@ -118,7 +118,6 @@
 <script async defer src="{{ asset('assets/js/buttons.js') }}"></script>
 <script src="{{ asset('assets/js/sweetalert.js') }}"></script>
 <script src="{{ asset('assets/js/alpine.js') }}" defer></script>
-
 <script>
 Vue.component('global-search', {
     props: {
@@ -139,14 +138,14 @@ Vue.component('global-search', {
             switch (this.userRole) {
                 @php use App\Enums\UserType; @endphp
                 case '{{ UserType::ADMIN->value }}':
-                    return 'Search assessors, accreditors, programs, areas, parameters...';
+                    return 'Search assessors, accreditors, programs, areas, parameters, documents...';
                 case '{{ UserType::DEAN->value }}':
-                    return 'Search task forces, programs, areas, parameters...';
+                    return 'Search task forces, programs, areas, parameters, documents...';
                 case '{{ UserType::TASK_FORCE->value }}':
                 case '{{ UserType::INTERNAL_ASSESSOR->value }}':
-                    return 'Search your assigned programs, areas, parameters...';
+                    return 'Search your assigned programs, areas, parameters, documents...';
                 case '{{ UserType::ACCREDITOR->value }}':
-                    return 'Search programs, areas, parameters, sub-parameters...';
+                    return 'Search programs, areas, parameters, sub-parameters, documents...';
                 default:
                     return 'Type to search...';
             }
@@ -201,7 +200,7 @@ Vue.component('global-search', {
         },
         debouncedSearch() {
             if (this.searchTimeout) clearTimeout(this.searchTimeout);
-            if (this.query.length < 1) { this.results = []; return; }
+            if (this.query.length < 0) { this.results = []; return; }
             this.searchTimeout = setTimeout(() => this.performSearch(), 300);
         },
         performSearch() {
@@ -298,6 +297,8 @@ Vue.component('global-search', {
                                 <a v-for="item in group.items"
                                     :key="item.id"
                                     :href="item.url"
+                                    :target="item.type === 'document' ? '_blank' : '_self'"
+                                    :rel="item.type === 'document' ? 'noopener noreferrer' : ''"
                                     class="gs-result">
 
                                     <!-- Icon box -->
@@ -502,9 +503,11 @@ Vue.component('global-search', {
         </div>
     `
 });
+</script>
 
 @stack('vue-components')
 
+<script>
 new Vue({
     el: '#vue-app',
     methods: {

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Parameter extends Model
 {
-        protected $fillable = ['parameter_name', 'area_id'];
+    protected $fillable = ['parameter_name', 'area_id'];
 
     public function area()
     {

@@ -31,30 +31,26 @@
                 <tbody class="table-border-bottom-0">
 
                     @forelse ($accreditations as $info)
-                        <tr>
+                        <tr style="cursor:pointer;" onclick="window.location='{{ route('accreditation.show', $info) }}'">
                             {{-- Accreditation --}}
                             <td>
                                 <i class="bx bx-certification bx-sm text-success me-2"></i>
-                                <span class="fw-medium">
-                                    {{ $info->title }}
-                                </span>
+                                <span class="fw-medium">{{ $info->title }}</span>
                             </td>
 
                             {{-- Year --}}
                             <td>{{ $info->year }}</td>
 
-                            {{-- Programs --}}
+                            {{-- Programs — count distinct programs across all mappings --}}
                             <td>
                                 <span class="badge bg-label-primary">
-                                    {{ $info->completed_programs_count }} Programs
+                                    {{ $info->infoLevelProgramMappings->count() }} Programs
                                 </span>
                             </td>
 
                             {{-- Status --}}
                             <td>
-                                <span class="badge bg-label-success">
-                                    Completed
-                                </span>
+                                <span class="badge bg-label-success">Completed</span>
                             </td>
 
                             {{-- Actions --}}
@@ -68,15 +64,12 @@
                                     </button>
 
                                     <div class="dropdown-menu">
-
-                                        {{-- View Completed Levels + Programs --}}
                                         <a
                                             class="dropdown-item"
-                                            href="">
+                                            href="{{ route('archive.show', $info) }}">
                                             <i class="bx bx-folder-open me-1"></i>
                                             View Completed Details
                                         </a>
-
                                     </div>
                                 </div>
                             </td>

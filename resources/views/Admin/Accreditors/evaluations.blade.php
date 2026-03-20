@@ -111,8 +111,8 @@
                                             {{ !in_array($status, [EvaluationStatus::FINALIZED, EvaluationStatus::UPDATED, EvaluationStatus::SUBMITTED]) ? '—' : '' }}
                                         </span>
                                     </td>
-                                    <td class="text-center">{{ $item['evaluation']->created_at->format('M d, Y h:i A') }}</td>
-                                    <td class="text-center">{{ $item['evaluation']->updated_at->format('M d, Y h:i A') }}</td>
+                                    <td class="text-center">{{ $item['evaluation']->created_at->format('M d, Y, h:i A') }}</td>
+                                    <td class="text-center">{{ $item['evaluation']->updated_at->format('M d, Y, h:i A') }}</td>
                                     <td class="text-center">
                                         <a href="{{ route('program.areas.evaluations.summary', [$item['evaluation']->id, $item['area']->id]) }}"
                                            class="btn btn-sm btn-outline-primary">View</a>
@@ -239,29 +239,233 @@ function printGrandMean(modalId) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
 
-    const printContents = modal.querySelector('.modal-content').innerHTML;
-    const originalContents = document.body.innerHTML;
+    const body = modal.querySelector('.modal-body');
 
-    document.body.innerHTML = `
-        <html>
-            <head>
-                <title>Summary of Ratings</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 40px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    table, th, td { border: 1px solid #000; }
-                    th, td { padding: 8px; }
-                    .modal-header button, .modal-footer { display: none !important; }
-                    .signature-line { width: 260px; border-bottom: 1.5px solid #000; margin: 6px auto 0; }
-                </style>
-            </head>
-            <body>${printContents}</body>
-        </html>
-    `;
+    const rows = [...body.querySelectorAll('table tbody tr')].map(tr => {
+        const cells = tr.querySelectorAll('td');
+        return { area: cells[0]?.innerText.trim(), mean: cells[1]?.innerText.trim() };
+    }).filter(r => r.area && r.mean);
 
-    window.print();
-    document.body.innerHTML = originalContents;
-    location.reload();
+    const total      = body.querySelector('.row:nth-of-type(1) .col-6:last-child')?.innerText.trim() ?? '';
+    const grandMean  = body.querySelector('.row:nth-of-type(2) .col-6:last-child')?.innerText.trim() ?? '';
+    const interp     = body.querySelector('.row:nth-of-type(3) .col-6:last-child')?.innerText.trim() ?? '';
+
+    // Collect all signatory names from the modal
+    const sigNames = [...body.querySelectorAll('.col-4 .fw-semibold')]
+                        .map(el => el.innerText.trim())
+                        .filter(Boolean);
+
+    // Split signatories into rows of 3
+    const sigRows = [];
+    for (let i = 0; i < sigNames.length; i += 3) {
+        sigRows.push(sigNames.slice(i, i + 3));
+    }
+
+    // Build each signatory row HTML — evenly spaced regardless of count
+    const sigRowsHtml = sigRows.map(rowNames => `
+        <div class="sig-row">
+            ${rowNames.map(name => `
+                <div class="sig-item">
+                    <div class="sig-name">${name}</div>
+                    <div class="sig-line"></div>
+                    <div class="sig-role">Internal Assessor</div>
+                </div>`).join('')}
+        </div>`).join('');
+
+    const printWin = window.open('', '_blank', 'width=850,height=1100');
+    printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Summary of Ratings</title>
+<style>
+    @page { size: A4 portrait; margin: 30mm 25mm 30mm 25mm; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11pt;
+        color: #000;
+        background: #fff;
+    }
+
+    .page {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    /* ── TITLE ── */
+    h1 {
+        text-align: center;
+        font-size: 13pt;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 18px;
+        letter-spacing: 0.5px;
+    }
+
+    /* ── TABLE ── */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 28px;
+    }
+
+    table th, table td {
+        border: 1px solid #000;
+        padding: 6px 10px;
+        font-size: 10.5pt;
+    }
+
+    table thead th {
+        text-align: center;
+        font-weight: bold;
+        background: #fff;
+    }
+
+    table thead th:last-child { width: 28%; text-align: center; }
+    table tbody td:last-child  { text-align: center; }
+
+    /* ── TOTALS ── */
+    .total-row {
+        display: flex;
+        justify-content: flex-end;
+        align-items: baseline;
+        margin-bottom: 18px;
+        gap: 12px;
+    }
+
+    .total-row .t-label {
+        font-size: 11pt;
+        min-width: 90px;
+        text-align: right;
+    }
+
+    .total-row .t-line {
+        width: 160px;
+        border-bottom: 1px solid #000;
+        font-size: 11pt;
+        text-align: center;
+        padding-bottom: 2px;
+    }
+
+    .total-row.grand-mean .t-line {
+        border-bottom: 2px double #000;
+    }
+
+    /* ── INTERPRETATION ── */
+    .interpretation {
+        display: flex;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: 12px;
+        margin-top: 4px;
+        margin-bottom: 40px;
+    }
+
+    .interpretation .i-label {
+        font-size: 11pt;
+        font-weight: bold;
+        min-width: 90px;
+        text-align: right;
+    }
+
+    .interpretation .i-value {
+        width: 320px;
+        border-bottom: 1px solid #000;
+        font-size: 10.5pt;
+        text-align: center;
+        padding-bottom: 2px;
+    }
+
+    /* ── SIGNATORIES ── */
+    .sig-section {
+        margin-top: auto;
+        padding-top: 40px;
+    }
+
+    .sig-row {
+        display: flex;
+        justify-content: space-around;
+        gap: 24px;
+        margin-bottom: 36px;
+    }
+
+    /* When only 1 or 2 signatories in a row, keep them from stretching full width */
+    .sig-row .sig-item {
+        flex: 0 1 220px;
+        text-align: center;
+    }
+
+    .sig-line {
+        border-top: 1px solid #000;
+        margin-top: 4px;
+        margin-bottom: 4px;
+        width: 100%;
+    }
+
+    .sig-name {
+        font-size: 10pt;
+        font-weight: bold;
+        margin-bottom: 2px;
+    }
+
+    .sig-role {
+        font-size: 9.5pt;
+    }
+</style>
+</head>
+<body>
+<div class="page">
+
+    <h1>Summary of Ratings</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Area</th>
+                <th>Area Mean</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${rows.map(r => `
+                <tr>
+                    <td>${r.area}</td>
+                    <td>${r.mean}</td>
+                </tr>`).join('')}
+        </tbody>
+    </table>
+
+    <div class="total-row">
+        <span class="t-label">Total</span>
+        <span class="t-line">${total}</span>
+    </div>
+    <div class="total-row grand-mean">
+        <span class="t-label">Grand Mean</span>
+        <span class="t-line">${grandMean}</span>
+    </div>
+
+    ${interp ? `
+    <div class="interpretation">
+        <span class="i-label">Interpretation</span>
+        <span class="i-value">${interp}</span>
+    </div>` : ''}
+
+    ${sigRows.length ? `
+    <div class="sig-section">
+        ${sigRowsHtml}
+    </div>` : ''}
+
+</div>
+</body>
+</html>`);
+
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); printWin.close(); }, 600);
 }
 </script>
 @endpush

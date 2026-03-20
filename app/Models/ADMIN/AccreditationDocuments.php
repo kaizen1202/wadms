@@ -10,6 +10,7 @@ class AccreditationDocuments extends Model
 {
    protected $fillable = [
         'subparameter_id',
+        'sub_sub_parameter_id', 
         'file_name',
         'file_path',
         'file_type',
@@ -21,6 +22,11 @@ class AccreditationDocuments extends Model
         'area_id',
         'parameter_id',
     ];
+
+    public function subSubParameter()
+    {
+        return $this->belongsTo(SubSubparameter::class, 'sub_sub_parameter_id');
+    }
     public function subParameter()
     {
         return $this->belongsTo(SubParameter::class, 'subparameter_id');

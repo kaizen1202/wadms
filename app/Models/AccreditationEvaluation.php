@@ -79,6 +79,11 @@ class AccreditationEvaluation extends Model
         return $this->status === EvaluationStatus::FINALIZED;
     }
 
+    public function subSubParameterRatings()
+    {
+        return $this->hasMany(SubSubParameterRating::class, 'evaluation_id');
+    }
+
     protected $casts = [
         'status' => EvaluationStatus::class,
     ];

@@ -10,10 +10,10 @@
     $isCompleted = $accreditationStatus === 'completed';
 
     $routeParams = [
-        'infoId' => $infoId,
-        'levelId' => $levelId,
-        'programId' => $programId,
-        'programAreaId' => $programAreaId
+        'infoId'       => $infoId,
+        'levelId'      => $levelId,
+        'programId'    => $programId,
+        'programAreaId' => $programAreaId,
     ];
 
     // Determine back URL
@@ -28,10 +28,10 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-1">
-                    {{ $subParameter->sub_parameter_name }}
+                    {{ $subSubParameter->name }}
                 </h4>
                 <p class="text-muted mb-0">
-                    Upload documents for this sub-parameter
+                    Upload documents for this sub-sub-parameter
                 </p>
             </div>
             <a href="{{ $backUrl }}" class="btn btn-secondary">
@@ -47,7 +47,7 @@
                 <span>This accreditation is completed and archived. All records are read-only.</span>
             </div>
         @endif
-        
+
         {{-- Upload Card --}}
         <div class="card mb-4">
             @if (!$isCompleted && ($user->currentRole->name === UserType::DEAN->value
@@ -55,14 +55,15 @@
                 ))
                 <div class="card-body">
                     <form
-                        action="{{ route('subparam.uploads.store', [
-                            'subParameter' => $subParameter->id,
-                            'infoId' => $infoId,
-                            'levelId' => $levelId,
-                            'programId' => $programId,
-                            'programAreaId' => $programAreaId,
+                        action="{{ route('subsubparam.uploads.store', [
+                            'infoId'            => $infoId,
+                            'levelId'           => $levelId,
+                            'programId'         => $programId,
+                            'programAreaId'     => $programAreaId,
+                            'subSubParameterId' => $subSubParameter->id,
                         ]) }}"
-                        method="POST" enctype="multipart/form-data">
+                        id="uploadForm"
+                        method="POST">
                         @csrf
 
                         <div class="mb-3">
@@ -71,12 +72,13 @@
                             {{-- Drop zone --}}
                             <div id="dropZone"
                                 onclick="document.getElementById('fileInput').click()"
-                                style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 2rem 1.5rem;
-                                        background: #f8fafc; cursor: pointer; transition: all .2s;
-                                        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;"
-                                ondragover="event.preventDefault(); this.style.borderColor='#0d6efd'; this.style.background='#eff6ff';"
+                                ondragenter="event.preventDefault(); this.style.borderColor='#0d6efd'; this.style.background='#eff6ff';"
+                                ondragover="event.preventDefault(); event.stopPropagation();"
                                 ondragleave="this.style.borderColor='#cbd5e1'; this.style.background='#f8fafc';"
-                                ondrop="handleDrop(event)">
+                                ondrop="handleDrop(event)"
+                                style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 2rem 1.5rem;
+                                    background: #f8fafc; cursor: pointer; transition: all .2s;
+                                    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;">
 
                                 <div style="width:48px; height:48px; background:#e0eaff; border-radius:50%;
                                             display:flex; align-items:center; justify-content:center;">
@@ -98,12 +100,12 @@
                         </div>
 
                         <div class="text-center">
-                            <button class="btn btn-primary px-4">
+                            <button class="btn btn-primary px-4" onclick="submitUpload()">
                                 <i class="bx bx-upload me-1"></i> Upload
                             </button>
                         </div>
                     </form>
-                </div>  
+                </div>
             @endif
         </div>
 
@@ -152,18 +154,18 @@
 
                                     {{-- VIEW --}}
                                     <a href="{{ Storage::url($upload->file_path) }}"
-                                    target="_blank"
-                                    class="btn btn-sm btn-outline-primary">
+                                        target="_blank"
+                                        class="btn btn-sm btn-outline-primary">
                                         <i class="bx bx-show"></i>
                                         View
                                     </a>
 
                                     {{-- DELETE (only uploader can delete, and only when not completed) --}}
                                     @if (!$isCompleted && $upload->uploader && $upload->uploader->id === auth()->id() && $upload->uploaderRole->id === auth()->user()->current_role_id)
-                                        <button 
+                                        <button
                                             class="btn btn-sm btn-outline-danger btn-delete"
                                             data-id="{{ $upload->id }}"
-                                            data-url="{{ route('subparam.uploads.destroy', $upload->id) }}"
+                                            data-url="{{ route('subsubparam.uploads.destroy', $upload->id) }}"
                                             data-name="{{ $upload->file_name }}"
                                             data-bs-toggle="modal"
                                             data-bs-target="#deleteModal">
@@ -175,7 +177,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted">
+                                <td colspan="7" class="text-center text-muted">
                                     No files uploaded yet.
                                 </td>
                             </tr>
@@ -206,20 +208,20 @@
                         <p>
                             Are you sure you want to delete <strong id="fileName"></strong> file?
                         </p>
-                        
+
                         <p class="text-danger mt-2 mb-0">
                             This action cannot be undone.
                         </p>
                     </div>
 
                     <div class="modal-footer">
-                        <button type="button" 
-                                class="btn btn-secondary" 
+                        <button type="button"
+                                class="btn btn-secondary"
                                 data-bs-dismiss="modal">
                             Cancel
                         </button>
 
-                        <button type="submit" 
+                        <button type="submit"
                                 class="btn btn-danger">
                             Yes, Delete
                         </button>
@@ -234,24 +236,20 @@
 @push('scripts')
 <script>
 $(document).ready(function () {
-
     $('#deleteModal').on('show.bs.modal', function (event) {
-
-        let button = $(event.relatedTarget); // Button that triggered modal
-        let url = button.data('url');        // Get delete URL
-        let name = button.data('name');      // Get file name
-
-        $('#deleteForm').attr('action', url); // Set form action
-        $('#fileName').text(name);            // Set file name text
-
+        let button = $(event.relatedTarget);
+        let url    = button.data('url');
+        let name   = button.data('name');
+        $('#deleteForm').attr('action', url);
+        $('#fileName').text(name);
     });
-
 });
 
-const dt = new DataTransfer();
+let selectedFiles = []; // ✅ plain array, works everywhere
 
 function handleDrop(e) {
     e.preventDefault();
+    e.stopPropagation();
     const zone = document.getElementById('dropZone');
     zone.style.borderColor = '#cbd5e1';
     zone.style.background  = '#f8fafc';
@@ -268,30 +266,60 @@ function handleFiles(incoming) {
             alert(`"${file.name}" exceeds 10MB and was skipped.`);
             continue;
         }
-        dt.items.add(file);
+        // Duplicate check
+        if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+            selectedFiles.push(file);
+        }
     }
-    document.getElementById('fileInput').files = dt.files;
     renderList();
 }
 
 function removeFile(index) {
-    dt.items.remove(index);
-    document.getElementById('fileInput').files = dt.files;
+    selectedFiles.splice(index, 1);
     renderList();
+}
+
+function submitUpload() {
+    if (selectedFiles.length === 0) {
+        alert('Please select at least one file.');
+        return;
+    }
+
+    const form = document.getElementById('uploadForm');
+    const formData = new FormData(form); // grabs CSRF token etc.
+
+    selectedFiles.forEach(file => {
+        formData.append('files[]', file);
+    });
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+    })
+    .then(res => {
+        if (res.redirected) {
+            window.location.href = res.url;
+        } else if (!res.ok) {
+            return res.json().then(data => { throw new Error(data.message || 'Upload failed'); });
+        } else {
+            window.location.reload();
+        }
+    })
+    .catch(err => alert(err.message));
 }
 
 function renderList() {
     const list = document.getElementById('fileList');
     list.innerHTML = '';
 
-    if (dt.files.length === 0) {
+    if (selectedFiles.length === 0) {
         list.style.display = 'none';
         return;
     }
 
     list.style.display = 'block';
 
-    Array.from(dt.files).forEach((file, i) => {
+    selectedFiles.forEach((file, i) => {
         const size = (file.size / 1024).toFixed(1) + ' KB';
         const li = document.createElement('li');
         li.style.cssText = 'display:flex; align-items:center; gap:.75rem; padding:.6rem .75rem; background:#fff; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:.5rem;';
@@ -314,4 +342,5 @@ function renderList() {
 }
 </script>
 @endpush
+
 @endsection

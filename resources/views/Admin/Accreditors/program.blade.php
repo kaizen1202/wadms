@@ -3,13 +3,19 @@
 @section('contents')
 <div class="container-xxl container-p-y">
 
+    @php $isCompleted = $accreditationStatus->value === 'completed'; @endphp
+
     {{-- Header --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1">
                     <li class="breadcrumb-item">
+                        @if (!$isCompleted)
                         <a href="{{ route('admin.accreditation.index') }}" class="text-muted">Accreditation</a>
+                        @else
+                        <a href="{{ route('accreditation.show', [$infoId]) }}" class="text-muted">Archive</a>
+                        @endif
                     </li>
                     <li class="breadcrumb-item active">Area Details</li>
                 </ol>
@@ -20,7 +26,8 @@
             </small>
         </div>
         <div class="d-flex gap-2">
-            @if ($isAdmin)
+            {{-- 1. Hide Add Area when completed --}}
+            @if ($isAdmin && !$isCompleted)
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignAreasModal">
                     <i class="bx bx-layer me-1"></i> Add Area
                 </button>
@@ -31,7 +38,16 @@
         </div>
     </div>
 
+    {{-- 2. Readonly alert --}}
+    @if ($isCompleted)
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+            <i class="bx bx-lock fs-5"></i>
+            <span>This accreditation is completed and archived. All records are read-only.</span>
+        </div>
+    @endif
+
     {{-- Stats row --}}
+    @if (!$isCompleted)
     <div class="row g-3 mb-4">
         <div class="col-sm-4">
             <div class="card border-0 shadow-sm" style="border-radius:10px;">
@@ -77,6 +93,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- Area Cards --}}
     <div class="row g-3">
@@ -129,8 +146,8 @@
 
                     </a>
 
-                    {{-- Footer action --}}
-                    @if ($isAdmin || $isDean)
+                    {{-- 3. Hide assign button when completed --}}
+                    @if (($isAdmin || $isDean) && !$isCompleted)
                         <div class="area-footer">
                             <button type="button"
                                 class="btn btn-sm btn-outline-primary w-100 assign-user-btn"
@@ -151,7 +168,7 @@
                 <div class="card border-0 shadow-sm text-center py-5" style="border-radius:12px;">
                     <i class="bx bx-layer d-block mb-3 text-muted" style="font-size:3rem; opacity:0.3;"></i>
                     <p class="text-muted mb-1">No areas found for this program.</p>
-                    @if ($isAdmin)
+                    @if ($isAdmin && !$isCompleted)
                         <small class="text-muted">Click "Add Area" to get started.</small>
                     @endif
                 </div>
@@ -160,6 +177,9 @@
     </div>
 
 </div>
+
+{{-- 4. Modals only when NOT completed --}}
+@if (!$isCompleted)
 
 {{-- ── Assign Areas Modal ── --}}
 <div class="modal fade" id="assignAreasModal" tabindex="-1">
@@ -273,9 +293,14 @@
     </div>
 </div>
 
+@endif
+{{-- End modals guard --}}
+
 @push('scripts')
 <script>
 $(function () {
+    @if (!$isCompleted)
+
     const programId = '{{ $programId }}';
 
     const ALL_USERS = [
@@ -564,6 +589,9 @@ $(function () {
             </span>
         `);
     }
+
+    @endif
+    {{-- End completed JS guard --}}
 });
 </script>
 @endpush

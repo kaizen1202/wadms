@@ -32,14 +32,6 @@ class AccreditationInfo extends Model
         return $this->belongsTo(AccreditationBody::class, 'accreditation_body_id');
     }
 
-    public function levels()
-    {
-        return $this->belongsToMany(
-            AccreditationLevel::class,
-            'accreditation_info_level'
-        );
-    }
-
     public function infoLevelProgramMappings()
     {
         return $this->hasMany(InfoLevelProgramMapping::class, 'accreditation_info_id');

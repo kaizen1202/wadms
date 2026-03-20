@@ -3,7 +3,7 @@
 namespace App\Models\ADMIN;
 
 use App\Enums\UserType;
-use App\Models\AreaEvaluation;
+use App\Models\AccreditationEvaluation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -81,6 +81,6 @@ class ProgramAreaMapping extends Model
 
     public function evaluations()
     {
-        return $this->hasMany(AreaEvaluation::class, 'program_area_mapping_id');
+        return $this->hasMany(AccreditationEvaluation::class, 'area_id');
     }
 }

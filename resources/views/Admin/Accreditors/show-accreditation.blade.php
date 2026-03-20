@@ -6,20 +6,47 @@
     {{-- ================= HEADER ================= --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>
-            <a href="{{ route('admin.accreditation.index') }}">
-                <span class="text-muted fw-light">Accreditation</span>
-            </a>
+            @if ($accreditation->status->value === 'completed')
+                <a href="{{ route('archive.completed') }}">
+                    <span class="text-muted fw-light">Archive</span>
+                </a>
+            @else
+                <a href="{{ route('admin.accreditation.index') }}">
+                    <span class="text-muted fw-light">Accreditation</span>
+                </a>
+            @endif
             / View Details
         </h2>
 
         <div class="d-flex gap-2">
-            @if ($isAdmin)
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editAccreditationModal">
-                    <i class="bx bx-edit me-1"></i> Edit Accreditation
-                </button>
+            @if ($accreditation->status->value === 'completed')
+                {{-- Archived banner --}}
+                <span class="badge bg-success fs-6 px-3 py-2">
+                    <i class="bx bx-archive-in me-1"></i> Archived
+                </span>
+            @else
+                @if ($isAdmin)
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editAccreditationModal">
+                        <i class="bx bx-edit me-1"></i> Edit Accreditation
+                    </button>
+                @endif
+
+                @if ($isAdmin)
+                    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#markCompletedModal">
+                        <i class="bx bx-check-circle me-1"></i> Mark as Completed
+                    </button>
+                @endif
             @endif
         </div>
     </div>
+
+    {{-- ================= READONLY ALERT ================= --}}
+    @if ($accreditation->status->value === 'completed')
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+            <i class="bx bx-lock fs-5"></i>
+            <span>This accreditation is completed and archived. All records are read-only.</span>
+        </div>
+    @endif
 
     {{-- ================= ACCREDITATION SUMMARY ================= --}}
     <div class="row mb-4">
@@ -109,9 +136,7 @@
             <div class="accordion" id="levelsAccordion">
 
                 @foreach($levels as $levelId => $items)
-                    @php
-                        $level = $items->first()->level;
-                    @endphp
+                    @php $level = $items->first()->level; @endphp
 
                     <div class="accordion-item mb-2">
                         <h2 class="accordion-header" id="level{{ $level->id }}">
@@ -119,12 +144,11 @@
                                     type="button"
                                     data-bs-toggle="collapse"
                                     data-bs-target="#collapse{{ $level->id }}">
-                                <span class="fw-semibold level-title"
-                                      data-level-id="{{ $level->id }}">
+                                <span class="fw-semibold level-title" data-level-id="{{ $level->id }}">
                                     {{ $items->first()->level_label ?? $level->level_name }}
                                 </span>
                                 <span class="badge bg-label-primary ms-3 programs-count-badge"
-                                    data-level-id="{{ $level->id }}">
+                                      data-level-id="{{ $level->id }}">
                                     {{ $items->count() }} {{ Str::plural('Program', $items->count()) }}
                                 </span>
                             </button>
@@ -138,41 +162,40 @@
                                     @foreach($items as $mapping)
                                         <div class="list-group-item d-flex justify-content-between align-items-center program-row">
                                             <a href="{{ route('admin.accreditations.program', [
-                                                'infoId' => $accreditation->id,
-                                                'levelId' => $level->id,
-                                                'programName' => $mapping->program->program_name
-                                            ]) }}"
-                                            title="View Areas">
-                                            
+                                                'infoId'      => $accreditation->id,
+                                                'levelId'     => $level->id,
+                                                'programName' => $mapping->program->program_name,
+                                            ]) }}" title="View Areas">
                                                 <span>{{ $mapping->program->program_name }}</span>
                                             </a>
-                                            
-                                            <div class="d-flex gap-2">
-                                                @if ($isAdmin)
-                                                    <button class="btn btn-xs btn-outline-primary edit-program-btn"
-                                                            title="Edit Program"
-                                                            data-mapping-id="{{ $mapping->id }}"
-                                                            data-current-name="{{ $mapping->program->program_name }}">
-                                                        <i class="bx bx-edit"></i>
-                                                        Edit
-                                                    </button>
 
-                                                    <button type="button"
-                                                            title="Delete Program"
-                                                            class="btn btn-xs btn-outline-danger delete-program-btn"
-                                                            data-mapping-id="{{ $mapping->id }}"
-                                                            data-program-name="{{ $mapping->program->program_name }}">
-                                                        <i class="bx bx-trash"></i>
-                                                        Delete
-                                                    </button>
-                                                @endif
-                                            </div>
+                                            {{-- Edit / Delete only when NOT completed --}}
+                                            @if ($accreditation->status->value !== 'completed')
+                                                <div class="d-flex gap-2">
+                                                    @if ($isAdmin)
+                                                        <button class="btn btn-xs btn-outline-primary edit-program-btn"
+                                                                title="Edit Program"
+                                                                data-mapping-id="{{ $mapping->id }}"
+                                                                data-current-name="{{ $mapping->program->program_name }}">
+                                                            <i class="bx bx-edit"></i> Edit
+                                                        </button>
+
+                                                        <button type="button"
+                                                                title="Delete Program"
+                                                                class="btn btn-xs btn-outline-danger delete-program-btn"
+                                                                data-mapping-id="{{ $mapping->id }}"
+                                                                data-program-name="{{ $mapping->program->program_name }}">
+                                                            <i class="bx bx-trash"></i> Delete
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </div>
 
-                                {{-- ADD PROGRAM --}}
-                                @if ($isAdmin)
+                                {{-- Add program only when NOT completed --}}
+                                @if ($isAdmin && $accreditation->status->value !== 'completed')
                                     <form class="mt-3 add-program-form">
                                         @csrf
                                         <input type="hidden" name="accreditation_info_id" value="{{ $accreditation->id }}">
@@ -180,175 +203,149 @@
 
                                         <div class="input-group">
                                             <input type="text"
-                                                name="program_name"
-                                                class="form-control"
-                                                placeholder="New Program"
-                                                required>
+                                                   name="program_name"
+                                                   class="form-control"
+                                                   placeholder="New Program"
+                                                   required>
                                             <button class="btn btn-primary">
                                                 <i class="bx bx-plus"></i>
                                             </button>
                                         </div>
                                     </form>
                                 @endif
+
                             </div>
                         </div>
                     </div>
                 @endforeach
+
             </div>
         </div>
     </div>
 </div>
 
-{{-- ================= EDIT ACCREDITATION MODAL ================= --}}
-<div class="modal fade" id="editAccreditationModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <form id="editAccreditationForm" class="modal-content">
-          @csrf
-          @method('PUT')
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Accreditation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+{{-- ================= MODALS (hidden when completed) ================= --}}
+@if ($accreditation->status->value !== 'completed')
+    {{-- EDIT ACCREDITATION MODAL --}}
+    <div class="modal fade" id="editAccreditationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <form id="editAccreditationForm" class="modal-content">
+                @csrf
+                @method('PUT')
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Accreditation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
 
-            <div class="modal-body">
-                <div class="row g-3">
-
-                    {{-- TITLE --}}
-                    <div class="col-md-6">
-                        <label class="form-label">Accreditation Title</label>
-                        <input type="text"
-                               name="title"
-                               class="form-control"
-                               value="{{ $accreditation->title }}"
-                               required>
-                    </div>
-
-                    {{-- ACCREDITATION BODY (NEW) --}}
-                    <div class="col-md-6">
-                        <label class="form-label">Accreditation Body</label>
-                        <input type="text"
-                               name="accreditation_body"
-                               class="form-control"
-                               value="{{ $accreditation->accreditationBody->name }}"
-                               required>
-                    </div>
-
-                    {{-- ACCREDITATION DATE --}}
-                    <div class="col-md-6">
-                        <label class="form-label">Accreditation Date</label>
-                        <input type="date"
-                               name="date"
-                               class="form-control"
-                               id="accreditationDate"
-                               value="{{ optional($accreditation->accreditation_date)->format('Y-m-d') }}">
-                    </div>
-
-                    {{-- VISIT TYPE --}}
-                    <div class="col-md-6">
-                        <label class="form-label">Visit Type</label>
-                        <select name="visit_type" class="form-select" required>
-                            <option value="physical" @selected($accreditation->visit_type === 'physical')>
-                                Physical
-                            </option>
-                            <option value="online" @selected($accreditation->visit_type === 'online')>
-                                Online
-                            </option>
-                        </select>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Accreditation Title</label>
+                            <input type="text" name="title" class="form-control"
+                                   value="{{ $accreditation->title }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Accreditation Body</label>
+                            <input type="text" name="accreditation_body" class="form-control"
+                                   value="{{ $accreditation->accreditationBody->name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Accreditation Date</label>
+                            <input type="date" name="date" class="form-control"
+                                   value="{{ optional($accreditation->accreditation_date)->format('Y-m-d') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Visit Type</label>
+                            <select name="visit_type" class="form-select" required>
+                                <option value="physical" @selected($accreditation->visit_type === 'physical')>Physical</option>
+                                <option value="online"   @selected($accreditation->visit_type === 'online')>Online</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        data-bs-dismiss="modal">
-                    Cancel
-                </button>
-                <button class="btn btn-primary">
-                    Save Changes
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- ================= EDIT PROGRAM MODAL ================= --}}
-<div class="modal fade" id="editProgramModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <form id="editProgramForm" class="modal-content">
-            @csrf
-            @method('PUT')
-
-            <input type="hidden" name="mapping_id" id="editProgramMappingId">
-
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Program</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <label class="form-label">Program Name</label>
-                <input type="text"
-                       name="program_name"
-                       id="editProgramName"
-                       class="form-control"
-                       required>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        data-bs-dismiss="modal">
-                    Cancel
-                </button>
-                <button class="btn btn-primary">
-                    Save
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- ================= DELETE PROGRAM MODAL ================= --}}
-<div class="modal fade" id="deleteProgramModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-
-            <div class="modal-header">
-                <h5 class="modal-title text-danger">
-                    Delete Program
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-
-            <div class="modal-body">
-                <p class="mb-0">
-                    Are you sure you want to delete
-                    <strong id="deleteProgramName"></strong>?
-                </p>
-                <small class="text-muted">
-                    This action cannot be undone.
-                </small>
-
-                <input type="hidden" id="deleteProgramMappingId">
-            </div>
-
-            <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-outline-secondary"
-                        data-bs-dismiss="modal">
-                    Cancel
-                </button>
-                <button type="button"
-                        class="btn btn-danger"
-                        id="confirmDeleteProgram">
-                    Delete
-                </button>
-            </div>
-
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
-</div>
+
+    {{-- MARK AS COMPLETED MODAL --}}
+    <div class="modal fade" id="markCompletedModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('archive.complete', $accreditation) }}">
+                    @csrf
+                    @method('PATCH')
+                    <div class="modal-header">
+                        <h5 class="modal-title text-success">
+                            <i class="bx bx-check-circle me-1"></i> Mark as Completed
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-1">Are you sure you want to mark <strong>{{ $accreditation->title }} {{ $accreditation->year }}</strong> as completed?</p>
+                        <small class="text-muted">This will move it to the archive and all records will become read-only.</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bx bx-check-circle me-1"></i> Yes, Mark as Completed
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- EDIT PROGRAM MODAL --}}
+    <div class="modal fade" id="editProgramModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <form id="editProgramForm" class="modal-content">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="mapping_id" id="editProgramMappingId">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Program</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Program Name</label>
+                    <input type="text" name="program_name" id="editProgramName" class="form-control" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- DELETE PROGRAM MODAL --}}
+    <div class="modal fade" id="deleteProgramModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">Delete Program</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">Are you sure you want to delete <strong id="deleteProgramName"></strong>?</p>
+                    <small class="text-muted">This action cannot be undone.</small>
+                    <input type="hidden" id="deleteProgramMappingId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteProgram">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+@endif
+{{-- End modals guard --}}
 
 @endsection
 
@@ -356,182 +353,134 @@
 <script>
 $(document).ready(function () {
 
+    @if ($accreditation->status->value !== 'completed')
+
     // ================= EDIT ACCREDITATION =================
     $('#editAccreditationForm').on('submit', function (e) {
         e.preventDefault();
-
-        let formData = new FormData(this);
-
         $.ajax({
             url: "{{ route('admin.accreditations.update', $accreditation->id) }}",
             type: "POST",
-            data: formData,
+            data: new FormData(this),
             processData: false,
             contentType: false,
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
             success: function (res) {
                 $('#accreditationTitle').text(res.data.title);
                 $('#accreditationBody').text(res.data.accreditation_body);
                 $('#visitType').text(res.data.visit_type);
                 $('#accreditationDate').text(res.data.accreditation_date);
-
                 $('#editAccreditationModal').modal('hide');
                 showToast(res.message);
             },
-            error: function () {
-                showToast('Something went wrong.', 'error');
-            }
+            error: function () { showToast('Something went wrong.', 'error'); }
         });
     });
 
     // ================= ADD PROGRAM =================
     $(document).on('submit', '.add-program-form', function (e) {
         e.preventDefault();
-
         let form = $(this);
-        let formData = new FormData(this);
-
         $.ajax({
             url: "{{ route('admin.accreditations.program.store') }}",
             type: "POST",
-            data: formData,
+            data: new FormData(this),
             processData: false,
             contentType: false,
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
             success: function (res) {
                 let newItem = `
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <span>${res.data.program_name}</span>
-
                         <div class="d-flex gap-2">
                             <button class="btn btn-xs btn-outline-primary edit-program-btn"
                                     data-mapping-id="${res.data.mapping_id}"
                                     data-current-name="${res.data.program_name}">
-                                <i class="bx bx-edit"></i>
-                                Edit
+                                <i class="bx bx-edit"></i> Edit
                             </button>
-
                             <button class="btn btn-xs btn-outline-danger delete-program-btn"
                                     data-mapping-id="${res.data.mapping_id}"
                                     data-program-name="${res.data.program_name}">
-                                <i class="bx bx-trash"></i>
-                                Delete
+                                <i class="bx bx-trash"></i> Delete
                             </button>
                         </div>
-                    </div>
-                `;
-
-                form.closest('.accordion-body')
-                    .find('.list-group')
-                    .append(newItem);
-
+                    </div>`;
+                form.closest('.accordion-body').find('.list-group').append(newItem);
                 form.trigger('reset');
                 showToast(res.message);
             },
             error: function (xhr) {
-                if (xhr.status === 422 && xhr.responseJSON?.message) {
-                    showToast(xhr.responseJSON.message, 'warning');
-                } else {
-                    showToast('Failed to add program.', 'error');
-                }
+                showToast(xhr.status === 422 ? xhr.responseJSON?.message : 'Failed to add program.', 'warning');
             }
         });
     });
 
-    // ================= EDIT PROGRAM OPEN MODAL =================
+    // ================= EDIT PROGRAM =================
     $(document).on('click', '.edit-program-btn', function () {
         $('#editProgramMappingId').val($(this).data('mapping-id'));
         $('#editProgramName').val($(this).data('current-name'));
         $('#editProgramModal').modal('show');
     });
 
-    // ================= EDIT PROGRAM SUBMIT =================
     $('#editProgramForm').on('submit', function (e) {
         e.preventDefault();
-
         let mappingId = $('#editProgramMappingId').val();
-        let formData = new FormData(this);
+        let formData  = new FormData(this);
         formData.append('_method', 'PATCH');
-
         $.ajax({
             url: `/admin/accreditations/program/${mappingId}`,
             type: "POST",
             data: formData,
             processData: false,
             contentType: false,
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
             success: function (res) {
                 $('[data-mapping-id="' + res.data.mapping_id + '"]')
-                    .closest('.list-group-item')
-                    .find('span:first')
-                    .text(res.data.program_name);
-
+                    .closest('.list-group-item').find('span:first').text(res.data.program_name);
                 $('#editProgramModal').modal('hide');
                 showToast(res.message);
             },
-            error: function () {
-                showToast('Something went wrong.', 'error');
-            }
+            error: function () { showToast('Something went wrong.', 'error'); }
         });
     });
 
-    // ================= DELETE PROGRAM OPEN MODAL =================
+    // ================= DELETE PROGRAM =================
     $(document).on('click', '.delete-program-btn', function () {
         $('#deleteProgramMappingId').val($(this).data('mapping-id'));
         $('#deleteProgramName').text($(this).data('program-name'));
         $('#deleteProgramModal').modal('show');
     });
 
+    $('#confirmDeleteProgram').on('click', function () {
+        let mappingId = $('#deleteProgramMappingId').val();
+        $.ajax({
+            url: `/admin/accreditations/program/${mappingId}`,
+            type: 'POST',
+            data: { _method: 'DELETE', _token: '{{ csrf_token() }}' },
+            headers: { 'Accept': 'application/json' },
+            success: function (res) {
+                $('[data-mapping-id="' + mappingId + '"]')
+                    .closest('.list-group-item').fadeOut(300, function () { $(this).remove(); });
+                $('#deleteProgramModal').modal('hide');
+                showToast(res.message);
+            },
+            error: function () { showToast('Failed to delete program.', 'error'); }
+        });
+    });
+
+    @endif
+    {{-- End completed guard --}}
+
+    // ================= ALWAYS: row click to navigate =================
     $(document).on('click', '.edit-program-btn, .delete-program-btn', function (e) {
-        e.stopPropagation(); // prevent parent <a> click
+        e.stopPropagation();
     });
 
     $(document).on('click', '.program-row', function () {
         const link = $(this).find('a').attr('href');
-        if(link) window.location.href = link;
-    });
-
-    // ================= CONFIRM DELETE PROGRAM =================
-    $('#confirmDeleteProgram').on('click', function () {
-        let mappingId = $('#deleteProgramMappingId').val();
-
-        $.ajax({
-            url: `/admin/accreditations/program/${mappingId}`,
-            type: 'POST',
-            data: {
-                _method: 'DELETE',
-                _token: '{{ csrf_token() }}'
-            },
-            headers: {
-                'Accept': 'application/json'
-            },
-            success: function (res) {
-                $('[data-mapping-id="' + mappingId + '"]')
-                    .closest('.list-group-item')
-                    .fadeOut(300, function () {
-                        $(this).remove();
-                    });
-
-                $('#deleteProgramModal').modal('hide');
-                showToast(res.message);
-            },
-            error: function () {
-                showToast('Failed to delete program.', 'error');
-            }
-        });
+        if (link) window.location.href = link;
     });
 
 });
 </script>
 @endpush
-
-

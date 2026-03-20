@@ -16,6 +16,11 @@ class SubParameter extends Model
         return $this->belongsTo(Parameter::class, 'parameter_id');
     }
 
+    public function subSubParameters()
+    {
+        return $this->hasMany(SubSubParameter::class);
+    }
+
     public function areaMappings()
     {
         return $this->belongsToMany(
@@ -25,14 +30,29 @@ class SubParameter extends Model
             'area_parameter_mapping_id'
         )->withTimestamps();
     }
- public function uploads()
-{
-    return $this->hasMany(
-        AccreditationDocuments::class,
-        'subparameter_id' 
-    );
-}
 
+    public function parameterSubparameterMapping()
+    {
+        return $this->hasOne(ParameterSubparameterMapping::class, 'subparameter_id');
+    }
 
-
+    // This goes through the paramSubparamMapping
+    public function subparamSubSubparamMapping()
+    {
+        return $this->hasOneThrough(
+            SubparamSubSubparamMapping::class,  
+            ParameterSubparameterMapping::class,         
+            'sub_parameter_id',                  
+            'parameter_subparameter_mapping_id', 
+            'id',                                
+            'id'                                
+        );
+    }
+    public function uploads()
+    {
+        return $this->hasMany(
+            AccreditationDocuments::class,
+            'subparameter_id' 
+        );
+    }
 }
