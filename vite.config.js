@@ -6,9 +6,9 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/accreditation.css',  
+                'resources/css/global-search.css', 
                 'resources/js/app.js',
-                'resources/css/accreditation.css',   // ← add this
-                'resources/css/global-search.css',   // ← add this
             ],
             refresh: true,
         }),

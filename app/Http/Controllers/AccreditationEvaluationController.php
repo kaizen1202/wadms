@@ -42,8 +42,6 @@ class AccreditationEvaluationController extends Controller
             'subparameterRatings.subparameter.parameter',
         ]);
 
-        $user = auth()->user();
-
         if ($user->currentRole->name === UserType::TASK_FORCE->value) {
             $query->whereHas('areaRecommendations', function ($q) use ($user) {
                 $q->whereHas('area', function ($areaQ) use ($user) {
@@ -66,14 +64,14 @@ class AccreditationEvaluationController extends Controller
         if (in_array($user->currentRole->name, [
             UserType::ACCREDITOR->value,
             UserType::ADMIN->value,
-            UserType::DEAN->value
+            UserType::DEAN->value,
         ])) {
             $query->where('status', EvaluationStatus::FINALIZED)
                 ->where('role_id', $internalAssessorRoleId);
         }
 
         $evaluations = $query->get()->groupBy(fn ($e) =>
-            $e->accred_info_id.'-'.$e->level_id.'-'.$e->program_id
+            $e->accred_info_id . '-' . $e->level_id . '-' . $e->program_id
         );
 
         $grandMeans  = [];
@@ -83,6 +81,22 @@ class AccreditationEvaluationController extends Controller
 
             $grandMeans[$key]  = [];
             $signatories[$key] = [];
+
+            // ✅ Extract accreditation/level/program from the group key
+            [$accredInfoId, $levelId, $programId] = explode('-', $key);
+
+            // ✅ Get ALL areas for this exact accreditation + level + program
+            // via ProgramAreaMapping — so unrated areas are still included
+            $allProgramAreaIds = \App\Models\ADMIN\ProgramAreaMapping::whereHas(
+                'infoLevelProgramMapping', fn ($q) => $q
+                    ->where('accreditation_info_id', $accredInfoId)
+                    ->where('level_id', $levelId)
+                    ->where('program_id', $programId)
+            )->pluck('area_id'); // ← change 'area_id' if your FK column is named differently
+
+            $allAreas = Area::whereIn('id', $allProgramAreaIds)
+                ->orderBy('id')
+                ->get();
 
             foreach ([
                 'internal'   => $internalAssessorRoleId,
@@ -100,7 +114,7 @@ class AccreditationEvaluationController extends Controller
                     if (in_array($user->currentRole->name, [
                         UserType::ACCREDITOR->value,
                         UserType::ADMIN->value,
-                        UserType::DEAN->value
+                        UserType::DEAN->value,
                     ]) && $evaluation->status !== EvaluationStatus::FINALIZED) {
                         continue;
                     }
@@ -133,21 +147,19 @@ class AccreditationEvaluationController extends Controller
                 $finalAreaMeans = collect($areaMeans)
                     ->map(fn ($means) => round(collect($means)->avg(), 2));
 
-                $allAreaIds = Area::pluck('id');
-                $areas      = Area::whereIn('id', $allAreaIds)->orderBy('id')->get();
-
+                // ✅ Map ALL areas — unrated ones default to 0
                 $finalAreaMeansMap = [];
-                foreach ($areas as $area) {
+                foreach ($allAreas as $area) {
                     $finalAreaMeansMap[$area->id] = $finalAreaMeans[$area->id] ?? 0;
                 }
 
                 $grandMeans[$key][$type] = [
-                    'areaModels' => $areas,
+                    'areaModels' => $allAreas,
                     'areas'      => collect($finalAreaMeansMap),
                     'total'      => collect($finalAreaMeansMap)->sum(),
-                    'grand'      => $areas->count()
-                                    ? collect($finalAreaMeansMap)->sum() / $areas->count()
-                                    : 0,
+                    'grand'      => $allAreas->count()
+                                        ? collect($finalAreaMeansMap)->sum() / $allAreas->count()
+                                        : 0,
                 ];
 
                 $signatories[$key][$type] = $filteredEvaluations
