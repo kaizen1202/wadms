@@ -14,7 +14,7 @@
         content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
     />
 
-    <title>Sign In</title>
+    <title>Login</title>
     <meta name="description" content="" />
 
     <!-- Favicon -->
@@ -91,21 +91,9 @@
                 <!-- Login Card -->
                 <div class="card">
                     <div class="card-body">
-                        <!-- Logo -->
-                        <div class="app-brand justify-content-center mb-4">
-                            <a href="{{ url('/') }}" class="app-brand-link">
-                                <span class="app-brand-logo demo">
-                                    <img src="{{ asset('assets/img/wdms/pit-logo-outlined.png') }}"
-                                         alt="Logo"
-                                         class="w-px-40 h-auto" />
-                                </span>
-                                <span class="app-brand-text demo text-body fw-bold ms-2 text-uppercase">PIT</span>
-                            </a>
-                        </div>
-                        <!-- /Logo -->
 
-                        <h4 class="mb-2 text-center fw-bold">Sign In</h4>
-                        <p class="mb-4 text-center">Please sign in to your account and start your session.</p>
+                        <h4 class="mb-2 text-center fw-bold">Login</h4>
+                        <p class="mb-4 text-center">Please login to your account and start your session.</p>
 
                         <!-- Session Status -->
                         @if (session('status'))
@@ -166,7 +154,7 @@
 
                             <!-- Submit -->
                             <div class="mb-3">
-                                <button type="submit" class="btn btn-primary d-grid w-100">Log In</button>
+                                <button type="submit" class="btn btn-primary d-grid w-100">Login</button>
                             </div>
                         </form>
 

@@ -406,4 +406,56 @@
     font-style: italic;
 }
 
+.ts-wrapper.multi .ts-control {
+    border: 1px solid #d9dee3 !important;
+    border-radius: 0.375rem !important;
+    padding: 0.422rem 0.875rem !important;
+    font-size: 0.9375rem !important;
+    font-weight: 400 !important;
+    line-height: 1.53 !important;
+    color: #697a8d !important;
+    background-color: #fff !important;
+    box-shadow: none !important;
+    transition: border-color 0.15s ease-in-out !important;
+}
+
+.ts-wrapper.multi .ts-control:focus-within,
+.ts-wrapper.multi.focus .ts-control {
+    border-color: #696cff !important;
+    box-shadow: none !important;
+}
+
+/* ── Action buttons ─────────────────────────────── */
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f0f1f3;
+    color: #566a7f;
+    font-size: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.action-btn:hover {
+    background: #696cff;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.action-btn--success:hover {
+    background: #71dd37;
+    color: #fff;
+}
+
+.action-btn--warning:hover {
+    background: #ffab00;
+    color: #fff;
+}
+
 

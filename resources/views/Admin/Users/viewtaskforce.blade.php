@@ -2,20 +2,19 @@
 
 @section('contents')
     <div class="content-wrapper">
-        <!-- Content -->
         <div class="container-xxl flex-grow-1 container-p-y">
 
-            {{-- PAGE HEADER WITH BACK BUTTON --}}
+            {{-- PAGE HEADER --}}
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h4 class="mb-0">
                     <a href="{{ route('users.taskforce.index') }}">
                         <span class="text-muted fw-light">Users</span>
-                    </a> 
+                    </a>
                     / Detail
                 </h4>
 
                 <a href="{{ route('users.taskforce.index') }}" class="btn btn-outline-primary">
-                    <i class="bx bx-arrow-back me-1"></i> Back to Task Force
+                    <i class="bx bx-arrow-back me-1"></i> Back to Active Accounts
                 </a>
             </div>
 
@@ -43,8 +42,9 @@
 
                     <div class="tab-content">
 
-                        {{-- ACCOUNT TAB --}}
+                        {{-- ================= ACCOUNT TAB ================= --}}
                         <div class="tab-pane fade show active" id="tab-account">
+
                             {{-- PROFILE CARD --}}
                             <div class="card mb-4">
                                 <h5 class="card-header">Profile Details</h5>
@@ -62,108 +62,108 @@
                                         <div>
                                             <h5 class="mb-1">{{ $user->name }}</h5>
 
-                                            {{-- STATUS BADGE --}}
                                             @php
                                                 $statusClass = match ($user->status) {
-                                                    'Active' => 'success',
-                                                    'Pending' => 'warning',
+                                                    'Active'    => 'success',
+                                                    'Pending'   => 'warning',
                                                     'Suspended' => 'danger',
-                                                    'Inactive' => 'secondary',
-                                                    default => 'secondary',
+                                                    'Inactive'  => 'secondary',
+                                                    default     => 'secondary',
                                                 };
                                             @endphp
 
-                                            <span class="badge bg-label-{{ $statusClass }}">
+                                            <span class="badge bg-label-{{ $statusClass }} mb-1">
                                                 {{ $user->status }}
                                             </span>
 
-                                            <p class="text-muted mt-2 mb-0">
-                                                {{ $user->user_type }}
-                                            </p>
+                                            <p class="text-muted mt-1 mb-0">{{ $user->user_type }}</p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <hr class="my-0" />
 
-                                {{-- DETAILS --}}
                                 <div class="card-body">
                                     <form onsubmit="return false">
                                         <div class="row">
                                             @php
                                                 $nameParts = explode(' ', trim($user->name));
-                                                $lastName = array_pop($nameParts);
+                                                $lastName  = array_pop($nameParts);
                                                 $firstName = implode(' ', $nameParts);
                                             @endphp
 
-                                            {{-- FIRST NAME --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">First Name</label>
-                                                <input class="form-control"
-                                                    value="{{ $firstName }}"
-                                                    disabled />
+                                                <input class="form-control" value="{{ $firstName }}" disabled />
                                             </div>
 
-                                            {{-- LAST NAME --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">Last Name</label>
-                                                <input class="form-control"
-                                                    value="{{ $lastName }}"
-                                                    disabled />
+                                                <input class="form-control" value="{{ $lastName }}" disabled />
                                             </div>
 
-                                            {{-- EMAIL --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">Email</label>
                                                 <input class="form-control" value="{{ $user->email }}" disabled />
                                             </div>
 
-                                            {{-- USER TYPE --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">Role</label>
                                                 <input class="form-control" value="{{ $user->user_type }}" disabled />
                                             </div>
 
-                                            {{-- STATUS --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">Status</label>
                                                 <input class="form-control" value="{{ $user->status }}" disabled />
                                             </div>
 
-                                            {{-- REGISTERED AT --}}
                                             <div class="mb-3 col-md-6">
                                                 <label class="form-label">Registered At</label>
-                                                <input class="form-control"
-                                                    value="{{ $user->created_at->format('M d, Y h:i A') }}" disabled />
+                                                <input class="form-control" value="{{ $user->created_at->format('M d, Y h:i A') }}" disabled />
                                             </div>
                                         </div>
                                     </form>
                                 </div>
                             </div>
 
-                            {{-- DANGER ZONE --}}
-                            <div class="card">
-                                <h5 class="card-header text-danger">Danger Zone</h5>
-
+                            {{-- DEACTIVATE ACCOUNT --}}
+                            <div class="card border-warning">
                                 <div class="card-body">
-                                    <div class="alert alert-warning">
-                                        <h6 class="alert-heading mb-1">Terminate User Account</h6>
-                                        <p class="mb-0">
-                                            Terminating this user will suspend their access immediately.
-                                        </p>
+                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="avatar flex-shrink-0">
+                                                <span class="avatar-initial rounded bg-label-warning">
+                                                    <i class="bx bx-user-x fs-4"></i>
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-1">Deactivate Account</h6>
+                                                <small class="text-muted">
+                                                    This will suspend the user's access immediately.
+                                                    They will not be able to log in until reactivated.
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        @if ($user->status === 'Active')
+                                            <button class="btn btn-warning btn-deactivate flex-shrink-0"
+                                                    data-id="{{ $user->id }}"
+                                                    data-url="{{ url('/users/' . $user->id . '/suspend') }}">
+                                                <i class="bx bx-lock me-1"></i> Deactivate
+                                            </button>
+                                        @else
+                                            <span class="badge bg-label-secondary px-3 py-2">
+                                                <i class="bx bx-lock-open me-1"></i> Already Inactive
+                                            </span>
+                                        @endif
+
                                     </div>
-
-                                   <button
-                                        class="btn btn-danger btn-terminate"
-                                        data-id="{{ $user->id }}"
-                                        data-url="{{ url('/users/' . $user->id . '/suspend') }}">
-                                        <i class="bx bx-trash me-1"></i> Terminate User
-                                    </button>
-
                                 </div>
                             </div>
+
                         </div>
-                        
+
                         {{-- ================= ASSIGNMENT TAB ================= --}}
                         <div class="tab-pane fade" id="tab-assignment">
 
@@ -178,13 +178,11 @@
                                         </p>
                                     @else
 
-                                        {{-- ACCORDION WRAPPER (IMPORTANT) --}}
                                         <div id="areas-accordion">
 
                                             @foreach ($assignmentHierarchy as $accreditation)
-
                                                 <div class="mb-4">
-                                                <h6 class="fw-bold mb-2">
+                                                    <h6 class="fw-bold mb-2">
                                                         {{ $accreditation['title'] }} {{ $accreditation['year'] }}
                                                     </h6>
                                                     <p class="text mb-2">
@@ -192,7 +190,7 @@
                                                     </p>
 
                                                     @foreach ($accreditation['programs'] as $program)
-                                                        
+
                                                         <p class="text mb-2">
                                                             Program: <span class="fw-bold">{{ $program['name'] }}</span>
                                                         </p>
@@ -201,39 +199,31 @@
 
                                                             @foreach ($program['areas'] as $areaId => $area)
 
-                                                                {{-- ================= AREA CARD ================= --}}
                                                                 <div class="col-md-4">
                                                                     <div class="card h-100 border shadow-sm">
                                                                         <div class="card-body">
-                                                                            <h6 class="fw-semibold mb-2">
-                                                                                {{ $area['name'] }}
-                                                                            </h6>
-
+                                                                            <h6 class="fw-semibold mb-2">{{ $area['name'] }}</h6>
                                                                             <button
                                                                                 class="btn btn-sm btn-outline-primary w-100"
                                                                                 data-bs-toggle="collapse"
                                                                                 data-bs-target="#area-details-{{ $areaId }}"
-                                                                                aria-expanded="false"
-                                                                                aria-controls="area-details-{{ $areaId }}">
+                                                                                aria-expanded="false">
                                                                                 View Details
                                                                             </button>
                                                                         </div>
                                                                     </div>
                                                                 </div>
 
-                                                                {{-- ================= COLLAPSIBLE DETAILS ================= --}}
                                                                 <div class="col-12">
-
                                                                     <div id="area-details-{{ $areaId }}"
-                                                                        class="collapse mt-3"
-                                                                        data-bs-parent="#areas-accordion">
+                                                                         class="collapse mt-3"
+                                                                         data-bs-parent="#areas-accordion">
 
                                                                         <div class="card border">
                                                                             <div class="card-body p-0">
 
-                                                                                {{-- ========== TASK FORCE VIEW ========== --}}
+                                                                                {{-- TASK FORCE VIEW --}}
                                                                                 @if ($isTaskForce)
-
                                                                                     <div class="table-responsive">
                                                                                         <table class="table table-sm table-bordered mb-0">
                                                                                             <thead class="table-light">
@@ -245,23 +235,16 @@
                                                                                                     <th>Action</th>
                                                                                                 </tr>
                                                                                             </thead>
-
                                                                                             <tbody>
                                                                                                 @foreach ($area['parameters'] ?? [] as $parameter)
                                                                                                     @foreach ($parameter['sub_parameters'] as $sub)
-
-                                                                                                        @php
-                                                                                                            $documents = $sub['documents'] ?? [];
-                                                                                                        @endphp
+                                                                                                        @php $documents = $sub['documents'] ?? []; @endphp
 
                                                                                                         @if (count($documents) === 0)
                                                                                                             <tr>
                                                                                                                 <td>{{ $parameter['name'] }}</td>
                                                                                                                 <td>{{ $sub['name'] }}</td>
-                                                                                                                <td colspan="3"
-                                                                                                                    class="text-muted fst-italic">
-                                                                                                                    No documents uploaded
-                                                                                                                </td>
+                                                                                                                <td colspan="3" class="text-muted fst-italic">No documents uploaded</td>
                                                                                                             </tr>
                                                                                                         @else
                                                                                                             @foreach ($documents as $doc)
@@ -269,20 +252,16 @@
                                                                                                                     <td>{{ $parameter['name'] }}</td>
                                                                                                                     <td>{{ $sub['name'] }}</td>
                                                                                                                     <td>
-                                                                                                                        <a href="{{ Storage::url($doc['file_path']) }}"
-                                                                                                                        target="_blank">
+                                                                                                                        <a href="{{ Storage::url($doc['file_path']) }}" target="_blank">
                                                                                                                             {{ $doc['file_name'] }}
                                                                                                                         </a>
                                                                                                                     </td>
                                                                                                                     <td>
-                                                                                                                        <span class="badge bg-success">
-                                                                                                                            {{ $doc['status'] }}
-                                                                                                                        </span>
+                                                                                                                        <span class="badge bg-success">{{ $doc['status'] }}</span>
                                                                                                                     </td>
                                                                                                                     <td>
-                                                                                                                        <a href="{{ Storage::url($doc['file_path']) }}"
-                                                                                                                        target="_blank"
-                                                                                                                        class="btn btn-sm btn-outline-primary">
+                                                                                                                        <a href="{{ Storage::url($doc['file_path']) }}" target="_blank"
+                                                                                                                           class="btn btn-sm btn-outline-primary">
                                                                                                                             View
                                                                                                                         </a>
                                                                                                                     </td>
@@ -296,41 +275,29 @@
                                                                                     </div>
                                                                                 @endif
 
-                                                                                {{-- ========== INTERNAL ASSESSOR VIEW ========== --}}
+                                                                                {{-- INTERNAL ASSESSOR VIEW --}}
                                                                                 @if ($isInternalAssessor)
-
-                                                                                    @php
-                                                                                        $evaluation = $area['evaluation'] ?? null;
-                                                                                    @endphp
+                                                                                    @php $evaluation = $area['evaluation'] ?? null; @endphp
 
                                                                                     <div class="p-3">
                                                                                         <div class="d-flex justify-content-between mb-3">
                                                                                             <strong>Evaluation Status</strong>
 
                                                                                             @if ($evaluation && $evaluation['status'] === 'Evaluated')
-                                                                                    
-                                                                                                <span class="badge bg-success">
-                                                                                                    Evaluated
-                                                                                                </span>
+                                                                                                <span class="badge bg-success">Evaluated</span>
                                                                                             @else
-                                                                                                <span class="badge bg-warning text-dark">
-                                                                                                    Pending
-                                                                                                </span>
+                                                                                                <span class="badge bg-warning text-dark">Pending</span>
                                                                                             @endif
                                                                                         </div>
 
-                                                                                        {{-- UPDATED INFO --}}
                                                                                         @if ($evaluation && ($evaluation['is_updated'] ?? false))
                                                                                             <p class="text-muted small mb-2">
                                                                                                 Last updated:
-                                                                                                {{ \Carbon\Carbon::parse($evaluation['updated_at'])
-                                                                                                    ->format('M d, Y h:i A') }}
+                                                                                                {{ \Carbon\Carbon::parse($evaluation['updated_at'])->format('M d, Y h:i A') }}
                                                                                             </p>
                                                                                         @endif
 
-                                                                                        {{-- SUMMARY --}}
                                                                                         @if ($evaluation && $evaluation['status'] === 'Evaluated')
-
                                                                                             <div class="mb-2">
                                                                                                 <span class="fw-semibold">Area Mean:</span>
                                                                                                 <span class="badge bg-success ms-2">
@@ -348,17 +315,11 @@
                                                                                                     </ul>
                                                                                                 </div>
                                                                                             @else
-                                                                                                <p class="text-muted fst-italic mb-0">
-                                                                                                    No recommendations provided.
-                                                                                                </p>
+                                                                                                <p class="text-muted fst-italic mb-0">No recommendations provided.</p>
                                                                                             @endif
-
                                                                                         @else
-                                                                                            <p class="text-muted fst-italic mb-0">
-                                                                                                No evaluation submitted for this area.
-                                                                                            </p>
+                                                                                            <p class="text-muted fst-italic mb-0">No evaluation submitted for this area.</p>
                                                                                         @endif
-
                                                                                     </div>
                                                                                 @endif
 
@@ -373,25 +334,51 @@
                                                 </div>
                                             @endforeach
 
-                                        </div> {{-- END ACCORDION --}}
+                                        </div>
                                     @endif
                                 </div>
                             </div>
                         </div>
 
-                        {{-- PERMISSIONS TAB (MUST BE OUTSIDE ASSIGNMENT TAB) --}}
+                        {{-- ================= PERMISSIONS TAB ================= --}}
                         <div class="tab-pane fade" id="tab-permissions">
-                            <p class="text-muted fst-italic">
-                                Permissions configuration coming soon.
-                            </p>
+                            <div class="card">
+                                <div class="card-body">
+                                    <p class="text-muted fst-italic mb-0">
+                                        Permissions configuration coming soon.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                    @endsection
+                    </div>{{-- end tab-content --}}
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    @push('scripts')
-                        <script>
-                            function terminateUser(id) {
-                                alert('Terminate user ID: ' + id + ' (fake action)');
-                            }
-                        </script>
-                    @endpush
+@endsection
+
+@push('scripts')
+<script>
+$(document).on('click', '.btn-deactivate', function () {
+    const id  = $(this).data('id');
+    const url = $(this).data('url');
+
+    if (!confirm('Are you sure you want to deactivate this user? They will lose access immediately.')) return;
+
+    $.ajax({
+        url,
+        method: 'PATCH',
+        headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+        success: function () {
+            showToast('User deactivated successfully.', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        },
+        error: function () {
+            showToast('Failed to deactivate user.', 'error');
+        }
+    });
+});
+</script>
+@endpush
