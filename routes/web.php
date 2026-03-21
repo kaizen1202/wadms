@@ -34,6 +34,8 @@ Route::middleware('auth')->group(function () {
 
 
 Route::middleware('auth')->group(function () {
+    Route::post('/users', [AdminTaskForceController::class, 'store'])
+        ->name('users.store');
     Route::get('/users', [AdminUserController::class, 'index'])
         ->name('users.index');
     Route::get('/users/data', [AdminUserController::class, 'data'])

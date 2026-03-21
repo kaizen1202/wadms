@@ -4,12 +4,15 @@ namespace App\Http\Controllers\ADMIN;
 
 use App\Http\Controllers\Controller;
 use App\Models\ADMIN\AccreditationAssignment;
+use App\Models\Role;
 use App\Models\User;
 use App\Enums\UserType;
 use App\Models\ADMIN\AccreditationDocuments;
 use App\Models\ADMIN\InfoLevelProgramMapping;
 use App\Models\AccreditationEvaluation;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 
 class AdminTaskForceController extends Controller
 {
@@ -23,6 +26,66 @@ class AdminTaskForceController extends Controller
             'admin.users.taskforce', 
             compact('isAdmin', 'isDean')
         );
+    }
+
+    /**
+     * Create account
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $request->validate([
+            'name'      => 'required|string|max:255',
+            'email'     => 'required|email|unique:users,email',
+            'user_type' => 'required|string',
+        ]);
+
+        $user    = auth()->user();
+        $isAdmin = $user->currentRole->name === UserType::ADMIN->value;
+        $isDean  = $user->currentRole->name === UserType::DEAN->value;
+
+        $allowedRoles = [];
+
+        if ($isAdmin) {
+            $allowedRoles = [
+                UserType::INTERNAL_ASSESSOR->value,
+                UserType::ACCREDITOR->value,
+            ];
+        }
+
+        if ($isDean) {
+            $allowedRoles = [
+                UserType::TASK_FORCE->value,
+            ];
+        }
+
+        if (!in_array($request->user_type, $allowedRoles)) {
+            return response()->json([
+                'message' => 'You are not allowed to create this role.'
+            ], 403);
+        }
+
+        $newUser = User::create([
+            'name'      => $request->name,
+            'email'     => $request->email,
+            'password'  => bcrypt(str()->random(32)),
+            'user_type' => UserType::from($request->user_type),
+            'status'    => 'Active',
+        ]);
+
+        // Assign role based on user_type
+        $roleSlug = str($newUser->user_type->value)->slug('_');
+        $role     = Role::where('slug', $roleSlug)->firstOrFail();
+
+        $newUser->roles()->syncWithoutDetaching([$role->id]);
+        $newUser->current_role_id = $role->id;
+        $newUser->save();
+
+        Password::sendResetLink(['email' => $newUser->email]);
+
+        return response()->json([
+            'message' => 'Account created. A password setup link has been sent to ' . $newUser->email,
+            'user'    => $newUser,
+        ], 201);
     }
 
     /**

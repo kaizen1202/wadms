@@ -526,8 +526,6 @@ Vue.component('global-search', {
                     <!-- ── Footer ── -->
                     <div class="gs-footer">
                         <div class="d-none d-sm-flex gap-3">
-                            <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-                            <span><kbd>Enter</kbd> open</span>
                             <span><kbd>Esc</kbd> close</span>
                         </div>
                         <span v-if="results.length > 0" class="gs-result-count">
